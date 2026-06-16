@@ -1,0 +1,54 @@
+PATENTS — Contributor dedication
+
+By contributing to time-tracking code, documentation, tests,
+configuration, or anything else committed to this repository you
+agree to the following, irrevocably:
+
+1. **Public-domain dedication.** Your contribution is released into
+   the public domain on the same terms as the rest of the project (see
+   LICENSE). You retain no copyright interest, no patent claim, and
+   no moral right that would restrict any subsequent use,
+   modification, redistribution, sublicensing, or commercial
+   exploitation of the contribution. The code you submit no longer
+   belongs to anyone, including you.
+
+2. **Copyright waiver.** To the extent permitted by your
+   jurisdiction, you waive all present and future copyright interest
+   in the contribution, for the benefit of the public at large and to
+   the detriment of your heirs and successors. Where a total waiver is
+   not legally possible, you grant a perpetual, worldwide,
+   royalty-free, irrevocable, non-exclusive licence to use, modify,
+   sublicense and redistribute the contribution, in source or binary
+   form, by any means and for any purpose.
+
+3. **Patent waiver.** You make no patent claim, and grant a perpetual,
+   worldwide, royalty-free, irrevocable, non-exclusive licence under
+   any patent right you may hold that reads on the contribution, to
+   anyone who uses, modifies, or distributes the project or any
+   derivative work. You will not initiate patent litigation against
+   downstream users on the basis of the contribution.
+
+4. **Authority to contribute.** You confirm the contribution is yours
+   to make: you have the right to dedicate it to the public domain,
+   and you are not bound by a separate contract (employment, NDA, work
+   for hire, etc.) that would restrict you from doing so. If you are
+   unsure, ask before contributing. If your employer holds rights on
+   work you do on company time or company hardware, get an explicit
+   waiver from them, or do not contribute under those circumstances.
+
+5. **No warranty.** The contribution is offered "as is", without
+   warranty of any kind. You will not be held liable for damage caused
+   by its use.
+
+----------------------------------------------------------------------
+
+This file exists for the same reason the project as a whole sits in
+the public domain: see the LICENSE preamble for the position behind
+it. The short version: returning to the commons what was taken from
+the commons is the minimum we can do given how the AI tools involved
+in producing part of this code were trained.
+
+Contributing under any other terms is not accepted. There is no CLA
+form to sign elsewhere, no signed copyright assignment to mail; the
+act of committing to this repository is the act of acceptance of the
+terms above.
