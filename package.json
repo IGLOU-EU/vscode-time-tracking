@@ -1,0 +1,145 @@
+{
+  "name": "time-tracking",
+  "displayName": "%ext.displayName%",
+  "description": "%ext.description%",
+  "version": "0.1.0",
+  "publisher": "iglou-eu",
+  "license": "Unlicense",
+  "author": "Adrien Kara <contact-vsix@iglou.eu>",
+  "engines": {
+    "vscode": "^1.93.0",
+    "node": ">=20.9.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/iglou.eu/vscode-time-tracking.git"
+  },
+  "homepage": "https://gitlab.com/iglou.eu/vscode-time-tracking",
+  "bugs": {
+    "url": "https://gitlab.com/iglou.eu/vscode-time-tracking/-/issues"
+  },
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "l10n": "./l10n",
+  "extensionKind": ["workspace"],
+  "activationEvents": ["onStartupFinished"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.untrusted.desc%"
+    },
+    "virtualWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.virtual.desc%"
+    }
+  },
+  "contributes": {
+    "commands": [
+      { "command": "timeTracking.openHistory", "title": "%cmd.openHistory%", "category": "%cmd.category%" },
+      { "command": "timeTracking.toggle", "title": "%cmd.toggle%", "category": "%cmd.category%" },
+      { "command": "timeTracking.pause", "title": "%cmd.pause%", "category": "%cmd.category%" },
+      { "command": "timeTracking.resume", "title": "%cmd.resume%", "category": "%cmd.category%" },
+      { "command": "timeTracking.ignoreSession", "title": "%cmd.ignoreSession%", "category": "%cmd.category%" },
+      { "command": "timeTracking.showLog", "title": "%cmd.showLog%", "category": "%cmd.category%" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "timeTracking", "title": "%view.container.title%", "icon": "resources/clock.svg" }
+      ]
+    },
+    "views": {
+      "timeTracking": [
+        { "type": "webview", "id": "timeTracking.historyView", "name": "%view.history.name%", "contextualTitle": "%view.container.title%" }
+      ]
+    },
+    "configuration": {
+      "title": "%config.title%",
+      "properties": {
+        "timeTracking.inactivityThresholdMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "scope": "machine-overridable",
+          "order": 1,
+          "markdownDescription": "%config.inactivityThreshold.desc%"
+        },
+        "timeTracking.backgroundProcessTimeoutMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "scope": "machine-overridable",
+          "order": 2,
+          "markdownDescription": "%config.bgTimeout.desc%"
+        },
+        "timeTracking.focusedIdleCapMinutes": {
+          "type": "number",
+          "default": 60,
+          "minimum": 0,
+          "scope": "machine-overridable",
+          "order": 3,
+          "markdownDescription": "%config.focusCap.desc%"
+        },
+        "timeTracking.debugIdleCapHours": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "scope": "machine-overridable",
+          "order": 3,
+          "markdownDescription": "%config.debugCap.desc%"
+        },
+        "timeTracking.gitUserEmail": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "order": 4,
+          "markdownDescription": "%config.gitUserEmail.desc%"
+        },
+        "timeTracking.debugLogging": {
+          "type": "boolean",
+          "default": false,
+          "scope": "machine-overridable",
+          "order": 5,
+          "markdownDescription": "%config.debugLogging.desc%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "watch": "run-p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "pretest": "tsc -p ./tsconfig.test.json",
+    "test:integration": "vscode-test",
+    "l10n:export": "npx @vscode/l10n-dev export -o ./l10n ./src"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/vscode": "^1.93.0",
+    "@types/node": "^20.19.0",
+    "@types/mocha": "^10.0.6",
+    "typescript": "^5.5.4",
+    "esbuild": "^0.24.0",
+    "npm-run-all2": "^6.2.2",
+    "eslint": "^9.13.0",
+    "@eslint/js": "^9.13.0",
+    "typescript-eslint": "^8.12.0",
+    "globals": "^15.12.0",
+    "vitest": "^2.1.1",
+    "@vitest/coverage-v8": "^2.1.1",
+    "mocha": "^10.7.3",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/l10n-dev": "^0.0.35",
+    "@vscode/vsce": "^3.2.0",
+    "ovsx": "^1.0.0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "ext.displayName": "Suivi du temps",
+  "ext.description": "Suivi automatique du temps, par fenetre, pour chaque projet.",
+  "cmd.category": "Suivi du temps",
+  "cmd.openHistory": "Ouvrir l'historique de suivi du temps",
+  "cmd.toggle": "Mettre en pause ou reprendre le suivi du temps",
+  "cmd.pause": "Mettre en pause le suivi du temps",
+  "cmd.resume": "Reprendre le suivi du temps",
+  "cmd.ignoreSession": "Ignorer la session courante",
+  "cmd.showLog": "Afficher le journal de suivi du temps",
+  "view.container.title": "Suivi du temps",
+  "view.history.name": "Historique",
+  "config.title": "Suivi du temps",
+  "config.inactivityThreshold.desc": "Minutes d'inactivite (fenetre active mais sans edition, selection, navigation, activite terminal ou tache) avant la mise en pause de la session.",
+  "config.bgTimeout.desc": "Minutes pendant lesquelles un process non-debug en arriere-plan (commande shell, plugin) peut tourner sans interaction avant que le suivi se mette en pause.",
+  "config.focusCap.desc": "Garde-fou, en minutes, d'une fenetre focus sans aucune activite (reflechir/lire compte jusque-la). Atteint, la traine inactive est consideree comme une session oubliee et deduite, pas facturee. `0` = jamais de pause tant que la fenetre est focus.",
+  "config.debugCap.desc": "Garde-fou, en heures, au-dela duquel une session de debug active cesse de maintenir le decompte sans interaction. `0` desactive le garde-fou (un debug en cours maintient toujours le suivi actif).",
+  "config.gitUserEmail.desc": "`user.email` Git utilise pour compter vos commits du jour. Laisser vide pour le lire depuis la configuration du depot.",
+  "config.debugLogging.desc": "Ecrit un journal d'activite detaille (signaux, decisions, intervalles enregistres) dans le canal de sortie \"Time Tracking\" et dans un fichier journal du stockage de l'extension. Pour le debogage uniquement.",
+  "capabilities.untrusted.desc": "Le suivi fonctionne dans les espaces de travail non approuves, mais le comptage des commits git est desactive tant que l'espace n'est pas approuve.",
+  "capabilities.virtual.desc": "Le suivi stocke ses donnees et surveille des fichiers sur le systeme de fichiers local, il est donc limite dans les espaces de travail virtuels."
+}

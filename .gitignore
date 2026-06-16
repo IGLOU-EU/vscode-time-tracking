@@ -1,0 +1,14 @@
+node_modules/
+dist/
+out/
+coverage/
+.vscode-test/
+*.vsix
+*.tsbuildinfo
+*.log
+.DS_Store
+
+# Local-only, never committed (per project owner): personal AI guidance and the
+# generated development guide. *.local* covers CLAUDE.local.md.
+*.local*
+docs/

@@ -1,0 +1,25 @@
+.vscode/**
+.vscode-test/**
+.vscode-test.mjs
+src/**
+out/**
+test/**
+test-fixtures/**
+docs/**
+node_modules/**
+.gitignore
+.git/**
+.github/**
+.gitlab-ci.yml
+esbuild.js
+eslint.config.mjs
+tsconfig.json
+tsconfig.test.json
+vitest.config.ts
+coverage/**
+AGENTS.md
+CONTRIBUTING.md
+*.local*
+**/*.map
+**/*.ts
+# Kept in the .vsix: dist/extension.js, media/**, l10n/**, package.nls*.json, resources/**, README.md, LICENSE, PATENTS, CHANGELOG.md
