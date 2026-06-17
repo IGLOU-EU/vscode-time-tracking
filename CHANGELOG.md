@@ -22,10 +22,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Status bar item: session time (with the time left before suspension during an idle
   countdown), "awaiting confirmation", "paused", or "no tracking", color-coded. Click toggles
   pause and resume.
-- History view (activity bar): 7-day trend curve, calendar heatmap (each cell's tooltip shows the
-  day's hours and, when present, the commit count), your git commits per day (by `user.email`),
-  current/previous month totals with the month-over-month variation, and a per-window breakdown.
-  Charts are inline SVG, themed, and work offline.
+- History view (activity bar): a 24-hour activity-density curve (a sliding-window activity rate,
+  so a long focus block is a plateau, pomodoro shows bumps, and breaks fall toward zero), calendar
+  heatmap (each cell's tooltip shows the day's hours and, when present, the commit count), your git
+  commits per day (by `user.email`), current/previous month totals with the month-over-month
+  variation, and a per-window breakdown. Charts are inline SVG, themed, and work offline.
 - Commands: open history, toggle pause, pause, resume, ignore current session, show log.
 - Settings: inactivity threshold, background process timeout, focused idle cap, debug idle cap,
   git user email, debug logging.

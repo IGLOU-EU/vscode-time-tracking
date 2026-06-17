@@ -7,8 +7,11 @@ import { aggregateByDay, buildMonthlyBadges, dayKeyLocal, type MonthlyBadges } f
 import { renderTrend, renderCalendarHeatmap, type DayValue } from './charts';
 import { mergeIntervals, splitAtMidnight, localMidnightOf, type Interval } from './intervals';
 
-const TREND_DAYS = 7;
+const TREND_HOURS = 24; // the trend spans the last 24 hours
 const HEATMAP_WEEKS = 15;
+const HOUR_MS = 3_600_000;
+const TREND_KERNEL_MS = 45 * 60_000; // half-width of the moving-average window for the activity rate
+const TREND_STEP_MS = 10 * 60_000; // sample spacing along the 24h axis
 
 /** An interval tagged with the window that produced it. */
 export interface TaggedInterval {
@@ -70,19 +73,40 @@ function breakdownByDay(tagged: readonly TaggedInterval[]): Map<string, WindowBr
   return out;
 }
 
-// Continuous, zero-filled day window ending at the local day of endMs (oldest to newest).
-function lastNDaysSeries(byDay: Map<string, number>, endMs: number, n: number): DayValue[] {
-  const end = new Date(endMs);
-  end.setHours(0, 0, 0, 0);
-  const out: DayValue[] = [];
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(end);
-    d.setDate(end.getDate() - i);
-    const key = dayKeyLocal(d.getTime());
-    out.push({ date: key, seconds: byDay.get(key) ?? 0 });
+/** One sample of the 24h activity curve: its instant and the activity rate (0 = idle, 1 = full). */
+interface RateSample {
+  readonly t: number;
+  readonly rate: number;
+}
+
+// Activity-rate curve over the last `hours` hours, sampled every TREND_STEP_MS. The rate at each
+// sample is the fraction of time actually tracked within a sliding +/-TREND_KERNEL_MS window
+// (cross-window union, so two overlapping windows never count twice). This moving average turns
+// the binary "tracked or not" signal into a smooth density: a long focus block is a plateau near 1,
+// pomodoro shows successive bumps, and absences fall back toward 0. The window is clipped to `now`
+// so the most recent sample is not dragged down by the empty future.
+function activityRateSeries(tagged: readonly TaggedInterval[], nowMs: number, hours: number): RateSample[] {
+  const merged = mergeIntervals(tagged.map((t) => ({ start: t.start, end: t.end })));
+  const start = nowMs - hours * HOUR_MS;
+  const out: RateSample[] = [];
+  for (let t = start; t <= nowMs; t += TREND_STEP_MS) {
+    const lo = t - TREND_KERNEL_MS;
+    const hi = Math.min(t + TREND_KERNEL_MS, nowMs);
+    const width = hi - lo;
+    let covered = 0;
+    for (const iv of merged) {
+      const a = Math.max(lo, iv.start);
+      const b = Math.min(hi, iv.end);
+      if (b > a) covered += b - a;
+    }
+    out.push({ t, rate: width > 0 ? covered / width : 0 });
   }
   return out;
 }
+
+const hourOf = (ms: number): number => new Date(ms).getHours();
+const minuteOf = (ms: number): number => new Date(ms).getMinutes();
+const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 // Continuous, Monday-aligned, zero-filled window of about `weeks` weeks ending at endMs.
 // Carries the commit count per day so the heatmap tooltip can show it.
@@ -131,9 +155,21 @@ export function buildHistoryModel(
 
   const byDay = new Map<string, number>(days.map((d) => [d.date, d.seconds]));
 
+  // 24h activity-density curve. Many close samples make it genuinely smooth; the value plotted is
+  // the 0..1 activity rate (DayValue.seconds carries it). Anchor the Y axis at 0 so absences reach
+  // the floor, with the top set to the window's peak plus headroom. Label the axis every 6th hour.
+  const samples = activityRateSeries(tagged, nowMs, TREND_HOURS);
+  const peak = Math.max(0, ...samples.map((s) => s.rate));
+  const trendSeries: DayValue[] = samples.map((s) => ({ date: dayKeyLocal(s.t), seconds: s.rate }));
+  const trendSvg = renderTrend(trendSeries, {
+    showDots: false,
+    scale: { min: 0, max: peak > 0 ? peak * 1.12 : 1 },
+    labelOf: (_d, i) => (hourOf(samples[i].t) % 6 === 0 && minuteOf(samples[i].t) < 10 ? pad2(hourOf(samples[i].t)) : ''),
+  });
+
   return {
     days,
-    trendSvg: renderTrend(lastNDaysSeries(byDay, nowMs, TREND_DAYS)),
+    trendSvg,
     heatmapSvg: renderCalendarHeatmap(heatmapSeries(byDay, commitsByDay, nowMs, HEATMAP_WEEKS)),
     months: buildMonthlyBadges(perDay, now.getFullYear(), now.getMonth()),
   };

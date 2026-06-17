@@ -33,9 +33,10 @@ your part.
   "awaiting confirmation", "paused", or "no tracking". During an idle
   countdown it shows the time left before suspension. Click to pause or
   resume.
-- History view (activity bar icon): 7-day trend curve, calendar heatmap
-  (hover a day for its hours and commit count), your git commits per day,
-  monthly totals with variation, and a per-window breakdown.
+- History view (activity bar icon): a 24-hour activity-density curve,
+  calendar heatmap (hover a day for its hours and commit count), your git
+  commits per day, monthly totals with variation, and a per-window
+  breakdown.
 - Data stored locally only.
 
 ## Compatibility

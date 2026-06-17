@@ -27,6 +27,21 @@ describe('buildHistoryModel', () => {
     expect(model.heatmapSvg).toContain('<svg');
   });
 
+  it('draws the 24h activity curve when there is activity within the last day', () => {
+    const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 10))]; // 3h before NOW
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.trendSvg).toContain('<path class="tt-trend-line"');
+    expect(model.trendSvg).toContain('<path class="tt-trend-area"');
+    expect(model.trendSvg).not.toContain('tt-trend-dot'); // density curve has no per-point dots
+  });
+
+  it('leaves the 24h trend empty when all activity is older than 24h, keeping the heatmap', () => {
+    const intervals = [tagged('w1', at(2026, 6, 14, 9), at(2026, 6, 14, 12))]; // two days before NOW
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.trendSvg).toBe(''); // nothing in the last 24h -> no curve
+    expect(model.heatmapSvg).not.toBe(''); // but the day still shows in the heatmap and day list
+  });
+
   it('exposes monthly totals for the badges', () => {
     const intervals = [
       tagged('w1', at(2026, 5, 10, 9), at(2026, 5, 10, 11)), // May: 2h

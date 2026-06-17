@@ -21,6 +21,26 @@ describe('renderTrend', () => {
     expect(count(svg, 'class="tt-trend-dot"')).toBe(7);
   });
 
+  it('honors custom labels (omitting empty ones) and custom tooltips', () => {
+    const svg = renderTrend(seven(0, 0, 0, 0, 0, 0, 7200), {
+      labelOf: (_d, i) => (i % 2 === 0 ? `L${i}` : ''),
+      titleOf: (_d, i) => `point ${i}`,
+    });
+    expect(svg).toContain('>L0</text>');
+    expect(svg).toContain('>L6</text>');
+    expect(svg).not.toContain('>L1</text>'); // odd indices omitted
+    expect(svg).toContain('<title>point 6</title>');
+    expect(svg).not.toContain(' h</title>'); // default tooltip fully overridden
+  });
+
+  it('with dots off draws no dots, and a fixed scale anchors a zero value to the baseline', () => {
+    const svg = renderTrend(seven(0, 0, 0, 0, 0, 0, 7200), { showDots: false, scale: { min: 0, max: 7200 } });
+    expect(svg).not.toContain('tt-trend-dot');
+    expect(svg).toContain('<path class="tt-trend-line"');
+    // first point is zero -> sits on the baseline (104); the curve starts there
+    expect(svg).toContain('<path class="tt-trend-line" d="M 10.0 104.0');
+  });
+
   it('keeps the curve within the plot (margin) and puts the busiest day highest', () => {
     const svg = renderTrend(seven(0, 0, 0, 0, 0, 3600, 7200));
     const cys = [...svg.matchAll(/cy="([\d.]+)"/g)].map((m) => Number(m[1]));

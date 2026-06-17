@@ -59,19 +59,43 @@ function smoothPath(pts: readonly Point[]): string {
 // Y axis spans the window's min..max with a margin, so the curve never touches the top or bottom.
 const TREND = { width: 300, height: 130, padX: 10, top: 12, baseline: 104, labelY: 120, yMarginRatio: 0.12 };
 
-/** 7-day trend: a thick line with one dot per day and a soft gradient area underneath. */
-export function renderTrend(series: readonly DayValue[]): string {
+/** Per-point x label and tooltip overrides, plus optional dots and a fixed Y scale. */
+export interface TrendOptions {
+  /** X-axis label for point i. Return '' to omit the label (e.g. thin out a dense hourly axis). */
+  readonly labelOf?: (d: DayValue, i: number) => string;
+  /** Tooltip text for point i (only emitted when dots are shown). */
+  readonly titleOf?: (d: DayValue, i: number) => string;
+  /** Draw a dot (with its tooltip) per point. Off for dense curves (e.g. a 24h density curve). */
+  readonly showDots?: boolean;
+  /** Fix the Y axis to [min, max] instead of deriving it from the data (anchors a curve at 0). */
+  readonly scale?: { readonly min: number; readonly max: number };
+}
+
+/** Trend: a thick smooth line, an optional dot per point, and a soft gradient area underneath. */
+export function renderTrend(series: readonly DayValue[], opts: TrendOptions = {}): string {
   if (series.length === 0 || allZero(series)) return ''; // empty state handled by the webview
+
+  const labelOf = opts.labelOf ?? ((d: DayValue): string => dayNumber(d.date));
+  const titleOf = opts.titleOf ?? ((d: DayValue): string => `${iso(d.date)}: ${hoursLabel(d.seconds)} h`);
+  const showDots = opts.showDots ?? true;
 
   const { width, height, padX, top, baseline, labelY, yMarginRatio } = TREND;
   const n = series.length;
   const values = series.map((d) => d.seconds);
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const span = max - min;
-  const margin = span > 0 ? span * yMarginRatio : 1; // headroom above/below, or a flat-line default
-  const lo = min - margin;
-  const range = max + margin - lo;
+  // Fixed scale (curve anchored at a chosen floor) or data-derived min..max with a margin.
+  let lo: number;
+  let range: number;
+  if (opts.scale) {
+    lo = opts.scale.min;
+    range = opts.scale.max - opts.scale.min || 1;
+  } else {
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const span = max - min;
+    const margin = span > 0 ? span * yMarginRatio : 1; // headroom above/below, or a flat-line default
+    lo = min - margin;
+    range = max + margin - lo;
+  }
   const plotH = baseline - top;
   const innerW = width - padX * 2;
 
@@ -81,15 +105,19 @@ export function renderTrend(series: readonly DayValue[]): string {
   const points: Point[] = series.map((d, i) => ({ x: xOf(i), y: yOf(d.seconds) }));
   const linePath = smoothPath(points);
   const areaPath = `${linePath} L ${xOf(n - 1).toFixed(1)} ${baseline} L ${xOf(0).toFixed(1)} ${baseline} Z`;
-  const dots = series
-    .map(
-      (d, i) =>
-        `<circle class="tt-trend-dot" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.seconds).toFixed(1)}" r="2.5">` +
-        `<title>${esc(iso(d.date))}: ${hoursLabel(d.seconds)} h</title></circle>`,
-    )
-    .join('');
+  const dots = showDots
+    ? series
+        .map(
+          (d, i) =>
+            `<circle class="tt-trend-dot" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.seconds).toFixed(1)}" r="2.5">` +
+            `<title>${esc(titleOf(d, i))}</title></circle>`,
+        )
+        .join('')
+    : '';
   const labels = series
-    .map((d, i) => `<text class="tt-axis-label" x="${xOf(i).toFixed(1)}" y="${labelY}" text-anchor="middle">${dayNumber(d.date)}</text>`)
+    .map((d, i) => ({ i, text: labelOf(d, i) }))
+    .filter((l) => l.text !== '')
+    .map((l) => `<text class="tt-axis-label" x="${xOf(l.i).toFixed(1)}" y="${labelY}" text-anchor="middle">${esc(l.text)}</text>`)
     .join('');
   // Vertical gradient for the area fill (Grafana-like fade). Stop colors come from CSS (theme accent).
   const defs =
