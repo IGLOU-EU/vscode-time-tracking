@@ -2,7 +2,7 @@
   "name": "time-tracking",
   "displayName": "%ext.displayName%",
   "description": "%ext.description%",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "iglou-eu",
   "license": "Unlicense",
   "author": "Adrien Kara <contact-vsix@iglou.eu>",
@@ -29,11 +29,17 @@
   "bugs": {
     "url": "https://gitlab.com/iglou.eu/vscode-time-tracking/-/issues"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "main": "./dist/extension.js",
   "l10n": "./l10n",
-  "extensionKind": ["workspace"],
-  "activationEvents": ["onStartupFinished"],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
@@ -46,21 +52,54 @@
   },
   "contributes": {
     "commands": [
-      { "command": "timeTracking.openHistory", "title": "%cmd.openHistory%", "category": "%cmd.category%" },
-      { "command": "timeTracking.toggle", "title": "%cmd.toggle%", "category": "%cmd.category%" },
-      { "command": "timeTracking.pause", "title": "%cmd.pause%", "category": "%cmd.category%" },
-      { "command": "timeTracking.resume", "title": "%cmd.resume%", "category": "%cmd.category%" },
-      { "command": "timeTracking.ignoreSession", "title": "%cmd.ignoreSession%", "category": "%cmd.category%" },
-      { "command": "timeTracking.showLog", "title": "%cmd.showLog%", "category": "%cmd.category%" }
+      {
+        "command": "timeTracking.openHistory",
+        "title": "%cmd.openHistory%",
+        "category": "%cmd.category%"
+      },
+      {
+        "command": "timeTracking.toggle",
+        "title": "%cmd.toggle%",
+        "category": "%cmd.category%"
+      },
+      {
+        "command": "timeTracking.pause",
+        "title": "%cmd.pause%",
+        "category": "%cmd.category%"
+      },
+      {
+        "command": "timeTracking.resume",
+        "title": "%cmd.resume%",
+        "category": "%cmd.category%"
+      },
+      {
+        "command": "timeTracking.ignoreSession",
+        "title": "%cmd.ignoreSession%",
+        "category": "%cmd.category%"
+      },
+      {
+        "command": "timeTracking.showLog",
+        "title": "%cmd.showLog%",
+        "category": "%cmd.category%"
+      }
     ],
     "viewsContainers": {
       "activitybar": [
-        { "id": "timeTracking", "title": "%view.container.title%", "icon": "resources/clock.svg" }
+        {
+          "id": "timeTracking",
+          "title": "%view.container.title%",
+          "icon": "resources/clock.svg"
+        }
       ]
     },
     "views": {
       "timeTracking": [
-        { "type": "webview", "id": "timeTracking.historyView", "name": "%view.history.name%", "contextualTitle": "%view.container.title%" }
+        {
+          "type": "webview",
+          "id": "timeTracking.historyView",
+          "name": "%view.history.name%",
+          "contextualTitle": "%view.container.title%"
+        }
       ]
     },
     "configuration": {
