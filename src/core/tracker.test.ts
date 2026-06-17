@@ -18,6 +18,7 @@ function setup(overrides: Partial<Parameters<typeof createTracker>[0]> = {}): {
     backgroundTimeoutMs: min(30),
     focusCapMs: min(60),
     debugIdleCapMs: 0,
+    minSessionMs: min(2),
     midnightOf: utcMidnightOf,
     ...overrides,
   });
@@ -161,10 +162,40 @@ describe('manual pause, resume, ignore', () => {
     const { tracker } = setup();
     tracker.recordActivity(T0);
     tracker.tick(T0);
-    tracker.pause(T0 + min(1));
-    expect(tracker.getPhase(T0 + min(1))).toBe('paused');
+    tracker.pause(T0 + min(3)); // past the noise threshold, so it really pauses
+    expect(tracker.getPhase(T0 + min(3))).toBe('paused');
     tracker.resume();
+    expect(tracker.getPhase(T0 + min(3))).toBe('idle');
+  });
+
+  it('a short session stopped by hand is discarded and returns to awaiting, not paused', () => {
+    const { tracker, emitted } = setup({ minSessionMs: min(2) });
+    const discarded: Array<{ ms: number; thresholdMs: number }> = [];
+    tracker.onSessionDiscarded((info) => discarded.push({ ms: info.ms, thresholdMs: info.thresholdMs }));
+    tracker.setPresence(true, T0);
+    tracker.recordActivity(T0 + min(0.2));
+    expect(tracker.getPhase(T0 + min(0.5))).toBe('active');
+    tracker.pause(T0 + min(1)); // under 2 min after the start: noise, not work
+    expect(emitted).toEqual([]);
+    expect(tracker.getPhase(T0 + min(1))).toBe('pending'); // focused -> awaiting confirmation
+    expect(discarded).toEqual([{ ms: min(0.8), thresholdMs: min(2) }]); // reported for the debug log
+  });
+
+  it('a short session stopped while unfocused is discarded back to idle', () => {
+    const { tracker, emitted } = setup({ minSessionMs: min(2) });
+    tracker.recordActivity(T0);
+    tracker.setPresence(false, T0 + min(0.5));
+    tracker.pause(T0 + min(1));
+    expect(emitted).toEqual([]);
     expect(tracker.getPhase(T0 + min(1))).toBe('idle');
+  });
+
+  it('minSessionMs = 0 keeps even a one-second hand pause', () => {
+    const { tracker, emitted } = setup({ minSessionMs: 0 });
+    tracker.recordActivity(T0);
+    tracker.pause(T0 + 1000);
+    expect(emitted).toEqual([{ start: T0, end: T0 + 1000 }]);
+    expect(tracker.getPhase(T0 + 1000)).toBe('paused');
   });
 
   it('ignoreCurrentSession drops the open session without emitting', () => {

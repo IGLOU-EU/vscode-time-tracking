@@ -64,6 +64,7 @@ working) and time it **trims off** (a forgetfulness safety net):
 | Background process timeout | `timeTracking.backgroundProcessTimeoutMinutes` | 30 min | A terminal/task process is running with no interaction | Pauses after the delay; **counted** as work |
 | Focus safety cap | `timeTracking.focusedIdleCapMinutes` | 60 min | Window **focused** but no action at all (a forgotten window) | Pauses; the idle tail is **not counted**, the session ends at your last real action |
 | Debug safety cap | `timeTracking.debugIdleCapHours` | 0 (never) | A debug session holds tracking open with no interaction | Off by default; when set, pauses and the tail is **not counted** |
+| Short-session threshold | `timeTracking.minSessionMinutes` | 1 min | You pause a session by hand sooner than this after it started | Treated as noise: **discarded** (not counted) and tracking returns to awaiting confirmation, not paused. `0` keeps every session |
 
 Two rules summarise it: while **focused** the session never pauses on
 inactivity (only the focus safety cap eventually stops it), and while

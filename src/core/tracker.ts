@@ -39,11 +39,18 @@ export interface CountdownInfo {
   readonly at: number;
 }
 
+export interface DiscardInfo {
+  readonly ms: number; // length of the discarded session
+  readonly thresholdMs: number; // the min-session threshold it fell under
+  readonly at: number;
+}
+
 export interface TrackerConfig {
   idleThresholdMs: number; // unfocused inactivity grace (billed)
   backgroundTimeoutMs: number; // running process without interaction (billed)
   focusCapMs: number; // focused-but-no-activity safety cap (deducted). 0 = never pause while focused
   debugIdleCapMs: number; // debug-without-interaction safety cap (deducted). 0 = never
+  minSessionMs: number; // a hand-paused session shorter than this is discarded as noise. 0 = keep all
   midnightOf?: (t: number) => number;
 }
 
@@ -73,6 +80,7 @@ export interface Tracker {
   onIntervalClosed(cb: (iv: Interval) => void): void;
   onPaused(cb: (info: PauseInfo) => void): void;
   onCountdownStarted(cb: (info: CountdownInfo) => void): void;
+  onSessionDiscarded(cb: (info: DiscardInfo) => void): void;
   setConfig(partial: Partial<TrackerConfig>): void;
 }
 
@@ -81,6 +89,7 @@ export function createTracker(config: TrackerConfig): Tracker {
   let backgroundTimeoutMs = config.backgroundTimeoutMs;
   let focusCapMs = config.focusCapMs;
   let debugIdleCapMs = config.debugIdleCapMs;
+  let minSessionMs = config.minSessionMs;
   const midnightOf = config.midnightOf ?? localMidnightOf;
 
   let phase: TrackPhase = 'idle';
@@ -95,6 +104,7 @@ export function createTracker(config: TrackerConfig): Tracker {
   const listeners: Array<(iv: Interval) => void> = [];
   const pauseListeners: Array<(info: PauseInfo) => void> = [];
   const countdownListeners: Array<(info: CountdownInfo) => void> = [];
+  const discardListeners: Array<(info: DiscardInfo) => void> = [];
 
   const cap = (ms: number): number => (ms > 0 ? ms : Number.POSITIVE_INFINITY);
 
@@ -163,6 +173,14 @@ export function createTracker(config: TrackerConfig): Tracker {
       terminalRunning = running;
     },
     pause(at) {
+      // A session this short, stopped by hand, is noise: a phantom start the user immediately
+      // rejects. Discard it unbilled and return to awaiting confirmation (pending when the window
+      // is focused, idle otherwise) rather than to paused, since no real work happened.
+      if (phase === 'active' && at - openStart < minSessionMs) {
+        for (const cb of discardListeners) cb({ ms: at - openStart, thresholdMs: minSessionMs, at });
+        phase = windowFocused ? 'pending' : 'idle';
+        return;
+      }
       manualPaused = true;
       if (phase === 'active') closeOpen(at);
       phase = 'idle';
@@ -247,11 +265,15 @@ export function createTracker(config: TrackerConfig): Tracker {
     onCountdownStarted(cb) {
       countdownListeners.push(cb);
     },
+    onSessionDiscarded(cb) {
+      discardListeners.push(cb);
+    },
     setConfig(partial) {
       if (partial.idleThresholdMs !== undefined) idleThresholdMs = partial.idleThresholdMs;
       if (partial.backgroundTimeoutMs !== undefined) backgroundTimeoutMs = partial.backgroundTimeoutMs;
       if (partial.focusCapMs !== undefined) focusCapMs = partial.focusCapMs;
       if (partial.debugIdleCapMs !== undefined) debugIdleCapMs = partial.debugIdleCapMs;
+      if (partial.minSessionMs !== undefined) minSessionMs = partial.minSessionMs;
     },
   };
 }

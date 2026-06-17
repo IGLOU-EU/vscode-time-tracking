@@ -34,6 +34,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     backgroundTimeoutMs: config.backgroundTimeoutMs,
     focusCapMs: config.focusCapMs,
     debugIdleCapMs: config.debugIdleCapMs,
+    minSessionMs: config.minSessionMs,
   });
 
   const storage = new StorageAdapter(context.globalStorageUri, windowId);
@@ -130,6 +131,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     });
   });
 
+  // Log when a session is discarded as noise (stopped by hand before the min-session threshold):
+  // explains why that short stretch of time vanished instead of being recorded.
+  tracker.onSessionDiscarded((info) => {
+    logger.log('discard', {
+      reason: 'short-session',
+      seconds: Math.round(info.ms / 1000),
+      thresholdMinutes: toMin(info.thresholdMs),
+    });
+  });
+
   // Log when a silence limit begins counting down toward a pause (activity just stopped).
   tracker.onCountdownStarted((info) => {
     logger.log('countdown', {
@@ -223,6 +234,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         backgroundTimeoutMs: cfg.backgroundTimeoutMs,
         focusCapMs: cfg.focusCapMs,
         debugIdleCapMs: cfg.debugIdleCapMs,
+        minSessionMs: cfg.minSessionMs,
       });
       gitEmail = cfg.gitUserEmail;
       logger.setEnabled(cfg.debugLogging);
