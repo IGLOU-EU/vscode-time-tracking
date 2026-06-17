@@ -46,6 +46,25 @@ describe('presence and confirmation', () => {
     tracker.flush(T0 + min(5));
     expect(emitted).toEqual([{ start: T0 + min(0.5), end: T0 + min(5) }]);
   });
+
+  it('flushing a focused window returns to pending, not idle (presence outlives the flush)', () => {
+    // Reproduces activation: the focus snapshot moves idle -> pending, then the initial project
+    // switch flushes. The window is still focused, so it must stay awaiting confirmation.
+    const { tracker } = setup();
+    tracker.setPresence(true, T0);
+    expect(tracker.getPhase(T0)).toBe('pending');
+    tracker.flush(T0);
+    expect(tracker.getPhase(T0)).toBe('pending');
+  });
+
+  it('flushing an unfocused window returns to idle', () => {
+    const { tracker, emitted } = setup();
+    tracker.recordActivity(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.flush(T0 + min(2));
+    expect(emitted).toEqual([{ start: T0, end: T0 + min(2) }]);
+    expect(tracker.getPhase(T0 + min(2))).toBe('idle');
+  });
 });
 
 describe('focused thinking', () => {

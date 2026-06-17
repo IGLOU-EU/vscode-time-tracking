@@ -216,7 +216,10 @@ export function createTracker(config: TrackerConfig): Tracker {
     },
     flush(now) {
       if (phase === 'active') closeOpen(now);
-      phase = 'idle';
+      // Presence outlives the flush: closing the open interval (e.g. on the initial project switch
+      // at activation, or when changing folders) does not mean the window stopped being focused. A
+      // focused window therefore returns to pending (awaiting confirmation), not idle.
+      phase = windowFocused ? 'pending' : 'idle';
     },
     getPhase() {
       return manualPaused ? 'paused' : phase;
