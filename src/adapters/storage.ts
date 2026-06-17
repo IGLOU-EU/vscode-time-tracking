@@ -20,6 +20,14 @@ interface OpenMarker {
 }
 
 export class StorageAdapter {
+  // Parsed intervals of settled (past-day) files, keyed by `projectId/filename`. A closed-day file
+  // is append-only and never rewritten (one writer per file, and every window only appends to its
+  // current-day file), so once the day is over it can be parsed once and reused. The current day's
+  // files stay live (any window may still append) and are always re-read, as are the open markers.
+  // watch() evicts any file the OS reports changed, covering the rare post-midnight append to the
+  // previous day's file and edits coming from another window.
+  private readonly parseCache = new Map<string, TaggedInterval[]>();
+
   constructor(
     private readonly root: vscode.Uri,
     private readonly windowId: string,
@@ -81,22 +89,42 @@ export class StorageAdapter {
   // every valid open marker. The core merges them (and breaks them down per window) at read time.
   async readAllTagged(projectId: string): Promise<TaggedInterval[]> {
     const dir = this.projectDir(projectId);
+    const today = dayKeyLocal(Date.now());
     const out: TaggedInterval[] = [];
+    const seen = new Set<string>();
     for (const [name, type] of await this.list(dir)) {
       if (type !== vscode.FileType.File) continue;
       const file = vscode.Uri.joinPath(dir, name);
       if (name.endsWith('.jsonl')) {
+        const key = `${projectId}/${name}`;
+        const settled = name.slice(0, 8) !== today; // file's day is over: safe to cache
+        if (settled) {
+          seen.add(key);
+          const cached = this.parseCache.get(key);
+          if (cached) {
+            out.push(...cached);
+            continue;
+          }
+        }
         const bytes = await this.readBytes(file);
         if (!bytes) continue;
-        for (const r of parseIntervals(dec.decode(bytes))) {
-          out.push({ windowId: r.windowId, start: r.start, end: r.end });
-        }
+        const parsed = parseIntervals(dec.decode(bytes)).map((r) => ({
+          windowId: r.windowId,
+          start: r.start,
+          end: r.end,
+        }));
+        if (settled) this.parseCache.set(key, parsed);
+        out.push(...parsed);
       } else if (name.endsWith('.open.json')) {
         const marker = await this.readJson<OpenMarker>(file);
         if (marker && marker.end > marker.start) {
           out.push({ windowId: marker.windowId, start: marker.start, end: marker.end });
         }
       }
+    }
+    // Drop cache entries for this project whose file is gone, so the map can't grow unbounded.
+    for (const key of this.parseCache.keys()) {
+      if (key.startsWith(`${projectId}/`) && !seen.has(key)) this.parseCache.delete(key);
     }
     return out;
   }
@@ -105,11 +133,18 @@ export class StorageAdapter {
     const pattern = new vscode.RelativePattern(this.projectDir(projectId), '*');
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
     const trigger = debounce(onChanged, 400);
+    // Evict the changed file from the parse cache before refreshing, so a settled file edited by
+    // another window (or appended just after midnight) is re-parsed instead of served stale.
+    const onEvent = (uri: vscode.Uri): void => {
+      const name = uri.path.slice(uri.path.lastIndexOf('/') + 1);
+      this.parseCache.delete(`${projectId}/${name}`);
+      trigger();
+    };
     return vscode.Disposable.from(
       watcher,
-      watcher.onDidChange(trigger),
-      watcher.onDidCreate(trigger),
-      watcher.onDidDelete(trigger),
+      watcher.onDidChange(onEvent),
+      watcher.onDidCreate(onEvent),
+      watcher.onDidDelete(onEvent),
     );
   }
 
