@@ -13,7 +13,7 @@
   "config.title": "Suivi du temps",
   "config.inactivityThreshold.desc": "Minutes d'inactivite (fenetre active mais sans edition, selection, navigation, activite terminal ou tache) avant la mise en pause de la session.",
   "config.bgTimeout.desc": "Minutes pendant lesquelles un process non-debug en arriere-plan (commande shell, plugin) peut tourner sans interaction avant que le suivi se mette en pause.",
-  "config.focusCap.desc": "Garde-fou, en minutes, d'une fenetre focus sans aucune activite (reflechir/lire compte jusque-la). Atteint, la traine inactive est consideree comme une session oubliee et deduite, pas facturee. `0` = jamais de pause tant que la fenetre est focus.",
+  "config.focusCap.desc": "Garde-fou, en minutes, d'une fenetre focus sans aucune activite (reflechir/lire compte jusque-la). Atteint, la traine inactive est consideree comme une session oubliee et n'est pas comptee. `0` = jamais de pause tant que la fenetre est focus.",
   "config.debugCap.desc": "Garde-fou, en heures, au-dela duquel une session de debug active cesse de maintenir le decompte sans interaction. `0` desactive le garde-fou (un debug en cours maintient toujours le suivi actif).",
   "config.gitUserEmail.desc": "`user.email` Git utilise pour compter vos commits du jour. Laisser vide pour le lire depuis la configuration du depot.",
   "config.debugLogging.desc": "Ecrit un journal d'activite detaille (signaux, decisions, intervalles enregistres) dans le canal de sortie \"Time Tracking\" et dans un fichier journal du stockage de l'extension. Pour le debogage uniquement.",

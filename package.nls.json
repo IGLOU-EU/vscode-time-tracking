@@ -13,7 +13,7 @@
   "config.title": "Time Tracking",
   "config.inactivityThreshold.desc": "Minutes of inactivity (window focused but no edits, selection, navigation, terminal or task activity) before the session is paused.",
   "config.bgTimeout.desc": "Minutes a non-debug background process (shell command, plugin) may run without interaction before tracking pauses.",
-  "config.focusCap.desc": "Safety cap, in minutes, of a focused window with no activity (thinking/reading still counts up to this). When reached, the idle tail is treated as a forgotten session and deducted, not billed. `0` means never pause while focused.",
+  "config.focusCap.desc": "Safety cap, in minutes, of a focused window with no activity (thinking/reading still counts up to this). When reached, the idle tail is treated as a forgotten session and is not counted. `0` means never pause while focused.",
   "config.debugCap.desc": "Safety cap, in hours, after which an active debug session stops keeping tracking alive without interaction. `0` disables the cap (a running debug session always keeps tracking active).",
   "config.gitUserEmail.desc": "Git `user.email` used to count your commits of the day. Leave empty to read it from the repository configuration.",
   "config.debugLogging.desc": "Write a detailed activity log (signals, decisions, recorded intervals) to the \"Time Tracking\" output channel and to a log file in the extension storage. For debugging only.",

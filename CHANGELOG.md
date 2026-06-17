@@ -11,11 +11,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Activity model: a real action (edit, selection, scroll, navigation, task, or any workspace
   file write, including a plugin like Claude Code, a build, or a folder creation) starts and
   sustains a session. Window focus keeps an active session alive (thinking and reading count)
-  and presence alone never bills until a real action. The real mouse is not used (no API).
+  and presence alone never counts until a real action. The real mouse is not used (no API).
 - Pause model: while focused, no inactivity pause, only a focus safety cap; unfocused, an
   inactivity grace from the moment focus is lost; a running process uses a background timeout;
-  a debug session holds tracking open. Timeouts (inactivity, background) are billed as work;
-  safety caps (focus, debug) are deducted so a forgotten session is not billed.
+  a debug session holds tracking open. Timeouts (inactivity, background) are counted as work;
+  safety caps (focus, debug) trim the idle tail so a forgotten session is not counted.
 - Per-window autonomous trackers. Time from multiple windows on the same project is merged
   (interval union) at read time, so overlapping windows are never double-counted.
 - Day boundary at local midnight: sessions crossing midnight are split.
