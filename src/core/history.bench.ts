@@ -43,6 +43,9 @@ const NOW = new Date(2026, 5, 17, 18, 0, 0, 0).getTime();
 // Build fixtures once so the cost is data crunching, not data generation.
 const oneYear = makeFixture(1);
 const fiveYears = makeFixture(5);
+// What the build step actually receives once the read is bounded to the rendered window
+// (heatmap 15 weeks + oldest badge month): ~16 weeks, regardless of total history length.
+const windowed = makeFixture(16 / 52);
 
 describe(`history read path (${RECORDS_PER_DAY} records/day)`, () => {
   // ~14.6k intervals: parse the on-disk JSONL into validated records.
@@ -62,6 +65,12 @@ describe(`history read path (${RECORDS_PER_DAY} records/day)`, () => {
 
   bench('build history model — 5 years', () => {
     buildHistoryModel(fiveYears.tagged, fiveYears.commits, NOW);
+  });
+
+  // Post guard-rail: the build only ever sees the rendered window, so this is the real recurring
+  // cost when the panel is kept open, whatever the history length behind it.
+  bench('build history model — windowed (~16 weeks)', () => {
+    buildHistoryModel(windowed.tagged, windowed.commits, NOW);
   });
 
   // End to end: parse from disk then build the model, i.e. one full panel open.

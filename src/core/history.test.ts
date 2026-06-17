@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildHistoryModel, type TaggedInterval } from './history';
+import { buildHistoryModel, historyWindowStartMs, type TaggedInterval } from './history';
 
 const at = (y: number, mo1: number, d: number, hh = 0, mm = 0): number =>
   new Date(y, mo1 - 1, d, hh, mm, 0, 0).getTime();
@@ -88,5 +88,27 @@ describe('buildHistoryModel', () => {
     const model = buildHistoryModel(intervals, {}, NOW);
     expect(model.days[0].windows).toHaveLength(1);
     expect(model.days[0].windows[0].ranges).toEqual([{ start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12) }]);
+  });
+});
+
+describe('historyWindowStartMs', () => {
+  it('starts no later than the oldest day the heatmap draws', () => {
+    // Heatmap spans 15 weeks ending today, aligned back to Monday.
+    const heatmapStart = new Date(NOW);
+    heatmapStart.setHours(0, 0, 0, 0);
+    heatmapStart.setDate(heatmapStart.getDate() - (15 * 7 - 1));
+    heatmapStart.setDate(heatmapStart.getDate() - ((heatmapStart.getDay() + 6) % 7));
+    expect(historyWindowStartMs(NOW)).toBeLessThanOrEqual(heatmapStart.getTime());
+  });
+
+  it('covers the oldest month the badges need (month before previous)', () => {
+    // NOW is June 2026, so the oldest badge month is April; its first day must be inside the window.
+    const oldestBadge = at(2026, 4, 1);
+    expect(historyWindowStartMs(NOW)).toBeLessThanOrEqual(oldestBadge);
+  });
+
+  it('does not reach absurdly far back (within ~16 weeks)', () => {
+    const sixteenWeeks = NOW - 16 * 7 * 24 * 3_600_000;
+    expect(historyWindowStartMs(NOW)).toBeGreaterThanOrEqual(sixteenWeeks);
   });
 });

@@ -87,15 +87,20 @@ export class StorageAdapter {
 
   // All intervals for a project, tagged with their window: every window's committed JSONL plus
   // every valid open marker. The core merges them (and breaks them down per window) at read time.
-  async readAllTagged(projectId: string): Promise<TaggedInterval[]> {
+  // `sinceMs`, when given, bounds the read to the rendered window: files for an earlier day are
+  // skipped instead of read. A one-day slack absorbs a session that started just before the window
+  // (it is stored under its start day). Open markers are current, so they are always read.
+  async readAllTagged(projectId: string, sinceMs?: number): Promise<TaggedInterval[]> {
     const dir = this.projectDir(projectId);
     const today = dayKeyLocal(Date.now());
+    const minDay = sinceMs === undefined ? undefined : dayKeyLocal(sinceMs - 86_400_000);
     const out: TaggedInterval[] = [];
     const seen = new Set<string>();
     for (const [name, type] of await this.list(dir)) {
       if (type !== vscode.FileType.File) continue;
       const file = vscode.Uri.joinPath(dir, name);
       if (name.endsWith('.jsonl')) {
+        if (minDay !== undefined && name.slice(0, 8) < minDay) continue; // older than the rendered window
         const key = `${projectId}/${name}`;
         const settled = name.slice(0, 8) !== today; // file's day is over: safe to cache
         if (settled) {

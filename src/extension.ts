@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
 
 import { createTracker, type Tracker } from './core/tracker';
-import { buildHistoryModel } from './core/history';
+import { buildHistoryModel, historyWindowStartMs } from './core/history';
 import { formatClock, hoursMinutes } from './core/activity';
 import { projectIdFromFsPath } from './core/project';
 import { dayKeyLocal } from './core/aggregate';
@@ -277,13 +277,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       };
     }
 
-    const tagged = await storage.readAllTagged(currentProjectId);
+    const now = new Date();
+    // Only read the files the charts and badges actually cover, not the whole history.
+    const tagged = await storage.readAllTagged(currentProjectId, historyWindowStartMs(now.getTime()));
     let commits: Record<string, number> = {};
     if (gitApi && currentFolder) {
       commits = await myCommitCountsByDay(gitApi, currentFolder, gitEmail).catch(() => ({}));
     }
 
-    const now = new Date();
     const model = buildHistoryModel(tagged, commits, now.getTime());
 
     const pct = model.months.previousVariationPct;

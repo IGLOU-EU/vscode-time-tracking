@@ -13,6 +13,25 @@ const HOUR_MS = 3_600_000;
 const TREND_KERNEL_MS = 45 * 60_000; // half-width of the moving-average window for the activity rate
 const TREND_STEP_MS = 10 * 60_000; // sample spacing along the 24h axis
 
+/**
+ * Earliest instant the rendered model actually reads: the oldest of the heatmap window
+ * (15 weeks, Monday-aligned) and the start of the month-before-previous (the oldest badge).
+ * The 24h trend and the 14-day list both fall inside the heatmap window, so they don't widen it.
+ * The adapter uses this to skip files older than the window instead of reading the whole history.
+ */
+export function historyWindowStartMs(nowMs: number): number {
+  const now = new Date(nowMs);
+
+  const heatmapStart = new Date(now);
+  heatmapStart.setHours(0, 0, 0, 0);
+  heatmapStart.setDate(heatmapStart.getDate() - (HEATMAP_WEEKS * 7 - 1));
+  heatmapStart.setDate(heatmapStart.getDate() - ((heatmapStart.getDay() + 6) % 7)); // back to Monday
+
+  const oldestBadgeMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1, 0, 0, 0, 0);
+
+  return Math.min(heatmapStart.getTime(), oldestBadgeMonth.getTime());
+}
+
 /** An interval tagged with the window that produced it. */
 export interface TaggedInterval {
   readonly windowId: string;
