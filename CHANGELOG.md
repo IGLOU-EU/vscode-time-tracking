@@ -5,6 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-06-17
+
+### Changed
+
+- History panel performance. Opening or refreshing the panel no longer reloads and re-parses the
+  entire history every time. Reads are bounded to the window the charts and badges actually show
+  (about 16 weeks), past-day files are parsed once and cached, and per-day commit counts are cached
+  per repository and refreshed only when the repository changes. Keeping the panel open (which
+  rebuilds about once a minute) stays responsive regardless of how many years have accumulated. No
+  change to what is tracked or displayed.
+
+### Tooling
+
+- Vitest benchmark for the history read path (`npm run bench`).
+- Integration tests for the storage adapter in a real Extension Host: JSONL round-trip, settled-day
+  parse cache, window bound, and watcher-driven cache eviction.
+
 ## [1.0.0] - 2026-06-17
 
 ### Added
