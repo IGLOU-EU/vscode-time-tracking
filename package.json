@@ -183,6 +183,7 @@
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
+    "bench": "vitest bench --run",
     "test:coverage": "vitest run --coverage",
     "pretest": "tsc -p ./tsconfig.test.json",
     "test:integration": "vscode-test",
