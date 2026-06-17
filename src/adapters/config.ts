@@ -7,6 +7,7 @@ export interface TimeTrackingConfig {
   readonly focusCapMs: number;
   readonly debugIdleCapMs: number;
   readonly minSessionMs: number;
+  readonly fontSizePx: number; // History panel base font size in px. 0 = follow the editor font size
   readonly gitUserEmail: string;
   readonly debugLogging: boolean;
 }
@@ -19,6 +20,7 @@ export function readConfig(): TimeTrackingConfig {
     focusCapMs: c.get<number>('focusedIdleCapMinutes', 60) * 60_000,
     debugIdleCapMs: c.get<number>('debugIdleCapHours', 0) * 3_600_000,
     minSessionMs: c.get<number>('minSessionMinutes', 1) * 60_000,
+    fontSizePx: c.get<number>('fontSize', 14),
     gitUserEmail: c.get<string>('gitUserEmail', '').trim(),
     debugLogging: c.get<boolean>('debugLogging', false),
   };

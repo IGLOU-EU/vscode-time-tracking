@@ -25,6 +25,11 @@
 
   /** @param {any} payload */
   function render(payload) {
+    // Apply the user's font-size setting (accessibility): the panel scales from it. 0 means defer
+    // to the editor font size, so drop the override and let the stylesheet fall back.
+    const fontSizePx = Number(payload.fontSizePx) || 0;
+    document.body.style.fontSize = fontSizePx > 0 ? `${fontSizePx}px` : '';
+
     const s = payload.strings || {};
     const m = payload.months || {};
     const days = Array.isArray(payload.days) ? payload.days : [];

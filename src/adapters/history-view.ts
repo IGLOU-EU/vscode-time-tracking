@@ -21,6 +21,7 @@ export interface HistoryPayload {
   }>;
   strings: Record<string, string>;
   todayHours: number;
+  fontSizePx: number; // base font size for the panel in px. 0 = follow the editor font size
 }
 
 export interface HistoryDataPort {

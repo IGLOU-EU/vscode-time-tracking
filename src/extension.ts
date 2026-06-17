@@ -28,6 +28,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const windowId = randomUUID();
   const config = readConfig();
   let gitEmail = config.gitUserEmail;
+  let fontSizePx = config.fontSizePx;
 
   const tracker: Tracker = createTracker({
     idleThresholdMs: config.idleThresholdMs,
@@ -237,6 +238,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         minSessionMs: cfg.minSessionMs,
       });
       gitEmail = cfg.gitUserEmail;
+      fontSizePx = cfg.fontSizePx;
       logger.setEnabled(cfg.debugLogging);
       refreshHistory();
     }),
@@ -272,6 +274,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         days: [],
         strings,
         todayHours: 0,
+        fontSizePx,
       };
     }
 
@@ -324,6 +327,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         })),
       strings,
       todayHours: today ? today.seconds / 3600 : 0,
+      fontSizePx,
     };
   }
 

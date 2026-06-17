@@ -1,5 +1,6 @@
-/* Time-tracking panel. Follows docs/webview-design-rules.md: one narrow column, three font
-   sizes (11/13/22), theme variables only, no animation, charts capped so they never blow up. */
+/* Time-tracking panel. Follows docs/webview-design-rules.md: one narrow column, theme variables
+   only, no animation, charts capped so they never blow up. Every size is in em off one base font,
+   so the whole panel scales with the user's chosen size, for accessibility. */
 
 * {
   box-sizing: border-box;
@@ -11,7 +12,7 @@ body {
   color: var(--vscode-foreground);
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
   font-family: var(--vscode-font-family);
-  font-size: 13px;
+  font-size: var(--vscode-font-size, 13px); /* the base every size scales from, for accessibility */
   overflow-x: hidden;
 }
 
@@ -25,22 +26,30 @@ body {
 
 .tt-header h1 {
   margin: 0;
-  font-size: 13px;
+  font-size: 1em;
   font-weight: 600;
 }
 
 .tt-actions {
   display: flex;
-  gap: 2px;
+  gap: 4px;
 }
 
+/* Icons follow the same base font as the rest, so accessibility scaling covers them too. The hover
+   target is in em as well so it never overflows the glyph at large sizes. */
 .tt-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6em;
+  height: 1.6em;
+  padding: 0;
   background: transparent;
   color: var(--vscode-icon-foreground, var(--vscode-foreground));
   border: none;
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 13px;
+  border-radius: 5px;
+  font-size: 1em;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -55,7 +64,7 @@ body {
 
 .tt-section h2 {
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: var(--tt-fs-small);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -79,20 +88,20 @@ body {
 }
 
 .tt-badge-label {
-  font-size: 11px;
+  font-size: var(--tt-fs-small);
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
 }
 
 .tt-badge-value {
   margin-top: 4px;
-  font-size: 22px;
+  font-size: var(--tt-fs-large);
   font-weight: 600;
   color: var(--vscode-foreground);
 }
 
 .tt-delta {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: var(--tt-fs-small);
   font-weight: 600;
 }
 
@@ -112,6 +121,10 @@ body {
 /* The theme's main color, used for the trend and the heatmap. */
 :root {
   --tt-accent: var(--vscode-button-background, var(--vscode-focusBorder, var(--vscode-charts-blue)));
+  /* Relative steps so every size follows the user's base font, keeping the panel's hierarchy. */
+  --tt-fs-tiny: 0.69em;
+  --tt-fs-small: 0.85em;
+  --tt-fs-large: 1.69em;
 }
 
 /* Charts fill the panel width, keeping their aspect ratio. */
@@ -129,7 +142,7 @@ body {
 
 .tt-axis-label {
   fill: var(--vscode-descriptionForeground, var(--vscode-foreground));
-  font-size: 9px;
+  font-size: var(--tt-fs-tiny);
   font-family: var(--vscode-font-family);
 }
 
@@ -194,7 +207,7 @@ body {
   justify-content: flex-end;
   gap: 4px;
   margin-top: 6px;
-  font-size: 9px;
+  font-size: var(--tt-fs-tiny);
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
 }
 
@@ -222,7 +235,7 @@ body {
 }
 
 .tt-day-date {
-  font-size: 13px;
+  font-size: 1em;
   color: var(--vscode-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -237,13 +250,13 @@ body {
 }
 
 .tt-day-commits {
-  font-size: 11px;
+  font-size: var(--tt-fs-small);
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
   font-variant-numeric: tabular-nums;
 }
 
 .tt-day-hours {
-  font-size: 13px;
+  font-size: 1em;
   font-weight: 600;
   color: var(--vscode-foreground);
   font-variant-numeric: tabular-nums;
@@ -251,7 +264,7 @@ body {
 
 .tt-windows {
   margin: 2px 0 0 12px;
-  font-size: 11px;
+  font-size: var(--tt-fs-small);
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
   overflow: hidden;
   text-overflow: ellipsis;
@@ -271,7 +284,7 @@ body {
 .tt-empty {
   padding: 24px 0;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--tt-fs-small);
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
 }
 
@@ -280,6 +293,6 @@ body {
   align-items: center;
   justify-content: center;
   height: 96px;
-  font-size: 11px;
+  font-size: var(--tt-fs-small);
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
 }
