@@ -1,6 +1,7 @@
 // Adapter: translate VSCode events into normalized tracking signals. No duration logic here.
 // Activity = edits, selection, scroll, navigation, returning focus, AND filesystem changes in
-// the workspace. The filesystem watcher is what makes work outside the editor count: a terminal
+// the workspace. Editor interactions count in on-disk files and untitled (unsaved) buffers; other
+// document schemes (output/log panels, debug repl, SCM input, settings UI) are machinery, not work. The filesystem watcher is what makes work outside the editor count: a terminal
 // command, a folder creation, or a plugin like Claude Code writing files directly to disk (which
 // never fires onDidChangeTextDocument). Continuous signals = active debug session, running tasks,
 // running terminal shell commands (1.93+, feature-gated). Losing focus is NOT a pause: working in
@@ -56,23 +57,28 @@ export function registerSignals(context: vscode.ExtensionContext, sinks: SignalS
     sinks.onActivity(now(), kind);
   };
 
+  // Real editing happens in on-disk files and untitled (unsaved) buffers. Every other scheme
+  // (output/log panels, debug repl, SCM input, settings UI, search editor, …) is machinery, not
+  // user work, so its edits/selection/scroll are not activity.
+  const isEditableDoc = (uri: vscode.Uri): boolean => uri.scheme === 'file' || uri.scheme === 'untitled';
+
   // Foreground + edit/selection/scroll/navigation.
   context.subscriptions.push(
     vscode.window.onDidChangeWindowState((state) => sinks.onPresence(state.focused, now())),
     vscode.workspace.onDidChangeTextDocument((e) => {
       const active = vscode.window.activeTextEditor;
       if (!active || e.document !== active.document) return; // ignore non-visible docs (logs, SCM)
-      if (e.document.uri.scheme !== 'file') return;
+      if (!isEditableDoc(e.document.uri)) return;
       if (e.contentChanges.length === 0) return;
       editorActivity('edit');
     }),
     vscode.window.onDidChangeTextEditorSelection((e) => {
-      if (e.textEditor.document.uri.scheme !== 'file') return;
+      if (!isEditableDoc(e.textEditor.document.uri)) return;
       editorActivity('selection');
     }),
     // Scrolling counts as activity: reading code is work even without typing.
     vscode.window.onDidChangeTextEditorVisibleRanges((e) => {
-      if (e.textEditor.document.uri.scheme !== 'file') return;
+      if (!isEditableDoc(e.textEditor.document.uri)) return;
       editorActivity('scroll');
     }),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
