@@ -9,11 +9,9 @@
 // The real mouse is not exposed by the API. Each activity carries a `kind` so the debug log shows
 // what triggered it.
 //
-// Editor interactions (edit/selection/scroll/navigation) are gated on window focus: an unfocused
-// window cannot receive genuine typing, clicking or scrolling, yet events like visible-ranges still
-// fire from layout reflows (e.g. windows shuffled across screens when a monitor is plugged or
-// unplugged), which would otherwise register as a phantom scroll. Background work (filesystem,
-// tasks, terminal) is NOT gated: writing files or running a build legitimately happens unfocused.
+// Editor interactions (edit/selection/scroll/navigation) only count while the window is focused: an
+// unfocused window cannot receive genuine input, so those events are spurious. Background work
+// (filesystem, tasks, terminal) is not gated, because it legitimately happens while unfocused.
 import * as vscode from 'vscode';
 
 export type ActivityKind =
@@ -50,8 +48,7 @@ function activeFolder(): vscode.Uri | undefined {
 export function registerSignals(context: vscode.ExtensionContext, sinks: SignalSinks): void {
   const now = (): number => Date.now();
 
-  // An editor interaction is only genuine when the window is focused (see the file header). When it
-  // is not, the event is a layout reflow or other side effect, not real work, so it is dropped.
+  // Editor events are only genuine while focused (see the file header). Otherwise they are spurious.
   const editorActivity = (kind: ActivityKind): void => {
     if (!vscode.window.state.focused) return;
     sinks.onActivity(now(), kind);

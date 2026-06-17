@@ -173,9 +173,8 @@ export function createTracker(config: TrackerConfig): Tracker {
       terminalRunning = running;
     },
     pause(at) {
-      // A session this short, stopped by hand, is noise: a phantom start the user immediately
-      // rejects. Discard it unbilled and return to awaiting confirmation (pending when the window
-      // is focused, idle otherwise) rather than to paused, since no real work happened.
+      // A session this short that the user stops by hand is noise, not work: discard it unbilled
+      // and go back to awaiting rather than paused.
       if (phase === 'active' && at - openStart < minSessionMs) {
         for (const cb of discardListeners) cb({ ms: at - openStart, thresholdMs: minSessionMs, at });
         phase = windowFocused ? 'pending' : 'idle';
@@ -234,9 +233,8 @@ export function createTracker(config: TrackerConfig): Tracker {
     },
     flush(now) {
       if (phase === 'active') closeOpen(now);
-      // Presence outlives the flush: closing the open interval (e.g. on the initial project switch
-      // at activation, or when changing folders) does not mean the window stopped being focused. A
-      // focused window therefore returns to pending (awaiting confirmation), not idle.
+      // A flush closes the interval but does not end the user's presence, so a still-focused window
+      // returns to pending (awaiting confirmation), not idle.
       phase = windowFocused ? 'pending' : 'idle';
     },
     getPhase() {

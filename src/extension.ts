@@ -132,8 +132,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     });
   });
 
-  // Log when a session is discarded as noise (stopped by hand before the min-session threshold):
-  // explains why that short stretch of time vanished instead of being recorded.
+  // Surface discarded-as-noise sessions in the log, so a vanished short session stays explainable.
   tracker.onSessionDiscarded((info) => {
     logger.log('discard', {
       reason: 'short-session',
