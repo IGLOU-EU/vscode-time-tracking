@@ -7,6 +7,7 @@ import {
   isStoredInterval,
   parseIntervals,
   toStoredInterval,
+  planDataFile,
   type StoredInterval,
 } from './jsonl';
 
@@ -87,5 +88,31 @@ describe('toStoredInterval', () => {
       start: 5,
       end: 9,
     });
+  });
+});
+
+describe('planDataFile', () => {
+  const TODAY = '20260617';
+  const MIN = '20260225'; // window starts Feb 25, 2026
+
+  it('skips a file whose day is older than the window', () => {
+    expect(planDataFile('20260224.w1.jsonl', TODAY, MIN)).toBe('skip');
+  });
+
+  it('keeps a file exactly on the window boundary (inclusive)', () => {
+    expect(planDataFile('20260225.w1.jsonl', TODAY, MIN)).toBe('cacheable');
+  });
+
+  it("marks the current day's file as live (always re-read)", () => {
+    expect(planDataFile('20260617.w1.jsonl', TODAY, MIN)).toBe('live');
+  });
+
+  it('marks a past in-window day as cacheable', () => {
+    expect(planDataFile('20260601.w1.jsonl', TODAY, MIN)).toBe('cacheable');
+  });
+
+  it('never skips when no window bound is given', () => {
+    expect(planDataFile('20200101.w1.jsonl', TODAY)).toBe('cacheable');
+    expect(planDataFile('20260617.w1.jsonl', TODAY)).toBe('live');
   });
 });

@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import { appendFile } from 'node:fs/promises';
 import { dayKeyLocal } from '../core/aggregate';
-import { serializeLine, toStoredInterval, parseIntervals } from '../core/jsonl';
+import { serializeLine, toStoredInterval, parseIntervals, planDataFile } from '../core/jsonl';
 import type { Interval } from '../core/intervals';
 import type { TaggedInterval } from '../core/history';
 
@@ -100,9 +100,10 @@ export class StorageAdapter {
       if (type !== vscode.FileType.File) continue;
       const file = vscode.Uri.joinPath(dir, name);
       if (name.endsWith('.jsonl')) {
-        if (minDay !== undefined && name.slice(0, 8) < minDay) continue; // older than the rendered window
+        const plan = planDataFile(name, today, minDay);
+        if (plan === 'skip') continue; // older than the rendered window
         const key = `${projectId}/${name}`;
-        const settled = name.slice(0, 8) !== today; // file's day is over: safe to cache
+        const settled = plan === 'cacheable';
         if (settled) {
           seen.add(key);
           const cached = this.parseCache.get(key);

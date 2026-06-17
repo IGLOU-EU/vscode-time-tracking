@@ -16,6 +16,24 @@ export interface StoredInterval {
   readonly end: number;
 }
 
+/** How a day data file should be treated when reading the history. */
+export type DataFilePlan =
+  | 'skip' // its day is older than the rendered window: not displayed, don't read it
+  | 'live' // the current day: another window may still append, so always re-read it
+  | 'cacheable'; // a past day: append-only and never rewritten, so parse once and reuse
+
+/**
+ * Classify a `<yyyyMMdd>.<windowId>.jsonl` data file by its day prefix, given today's day key and
+ * (optionally) the window's earliest day key. Pure decision the storage adapter applies per file;
+ * `minDayKey` is inclusive (a file exactly on the boundary is kept). YYYYMMDD sorts lexically, so
+ * plain string comparison is a date comparison.
+ */
+export function planDataFile(name: string, todayKey: string, minDayKey?: string): DataFilePlan {
+  const day = name.slice(0, 8);
+  if (minDayKey !== undefined && day < minDayKey) return 'skip';
+  return day === todayKey ? 'live' : 'cacheable';
+}
+
 /** Parse JSONL text into objects, silently skipping any unparsable line. */
 export function parseJsonl(text: string): unknown[] {
   const out: unknown[] = [];

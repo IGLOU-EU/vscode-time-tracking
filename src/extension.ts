@@ -13,10 +13,9 @@ import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
 import { StorageAdapter } from './adapters/storage';
 import { registerSignals } from './adapters/signals';
-import { getGitApi, myCommitCountsByDay } from './adapters/git';
+import { getGitApi, CommitCounts } from './adapters/git';
 import { HistoryViewProvider, type HistoryPayload, type HistoryDataPort } from './adapters/history-view';
 import { createLogger } from './adapters/logger';
-import type { API as GitAPI } from './adapters/git-types';
 
 const TICK_MS = 15_000;
 const CHECKPOINT_MS = 60_000;
@@ -49,7 +48,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   let currentProjectId: string | undefined;
   let currentFolder: vscode.Uri | undefined;
-  let gitApi: GitAPI | undefined;
+  let commitCounts: CommitCounts | undefined;
   let watcher: vscode.Disposable | undefined;
   let lastActivityTickAt = 0; // coalesces bursty activity (one keystroke fires 3 events)
 
@@ -239,6 +238,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       gitEmail = cfg.gitUserEmail;
       fontSizePx = cfg.fontSizePx;
       logger.setEnabled(cfg.debugLogging);
+      commitCounts?.clear(); // the configured email feeds the counts; git state won't signal its change
       refreshHistory();
     }),
   );
@@ -278,11 +278,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     const now = new Date();
-    // Only read the files the charts and badges actually cover, not the whole history.
-    const tagged = await storage.readAllTagged(currentProjectId, historyWindowStartMs(now.getTime()));
+    // Only read what the charts and badges actually cover, not the whole history.
+    const sinceMs = historyWindowStartMs(now.getTime());
+    const tagged = await storage.readAllTagged(currentProjectId, sinceMs);
     let commits: Record<string, number> = {};
-    if (gitApi && currentFolder) {
-      commits = await myCommitCountsByDay(gitApi, currentFolder, gitEmail).catch(() => ({}));
+    if (commitCounts && currentFolder) {
+      commits = await commitCounts.byDay(currentFolder, gitEmail, sinceMs).catch(() => ({}));
     }
 
     const model = buildHistoryModel(tagged, commits, now.getTime());
@@ -335,7 +336,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const initialFolder = activeFolderUri();
   if (initialFolder) await setProject(initialFolder);
   void getGitApi().then((api) => {
-    gitApi = api;
+    if (!api) return;
+    commitCounts = new CommitCounts(api);
+    context.subscriptions.push(commitCounts);
     refreshHistory();
   });
   refreshStatus(Date.now());

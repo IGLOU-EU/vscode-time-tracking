@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { countMyCommitsForDay, localDayBounds, type CommitRecord } from './commits';
+import { countMyCommitsByDay, countMyCommitsForDay, localDayBounds, type CommitRecord } from './commits';
 
 const MY = 'adrien@iglou.eu';
 const bounds = localDayBounds(2026, 5, 16); // June 16, 2026 (month0 = 5)
@@ -56,5 +56,46 @@ describe('countMyCommitsForDay', () => {
 
   it('returns 0 when the reference email is empty', () => {
     expect(countMyCommitsForDay([commit()], { ...q, myEmail: '   ' })).toBe(0);
+  });
+});
+
+describe('countMyCommitsByDay', () => {
+  const since = new Date(2026, 5, 10, 0, 0, 0, 0).getTime(); // window starts June 10, 2026
+  const q = { myEmail: MY, sinceMs: since };
+  const on = (y: number, mo1: number, d: number, hh = 10): Date => new Date(y, mo1 - 1, d, hh, 0, 0, 0);
+
+  it('groups my non-merge commits by local day', () => {
+    const counts = countMyCommitsByDay(
+      [commit({ authorDate: on(2026, 6, 16) }), commit({ authorDate: on(2026, 6, 16, 14) }), commit({ authorDate: on(2026, 6, 15) })],
+      q,
+    );
+    expect(counts).toEqual({ '20260616': 2, '20260615': 1 });
+  });
+
+  it('drops commits authored before the window start', () => {
+    const counts = countMyCommitsByDay([commit({ authorDate: on(2026, 6, 9) })], q);
+    expect(counts).toEqual({});
+  });
+
+  it('keeps a commit authored exactly at the window start (inclusive)', () => {
+    const counts = countMyCommitsByDay([commit({ authorDate: new Date(since) })], q);
+    expect(counts).toEqual({ '20260610': 1 });
+  });
+
+  it('excludes merges and other authors', () => {
+    const counts = countMyCommitsByDay(
+      [commit({ parentCount: 2 }), commit({ authorEmail: 'other@example.com' })],
+      q,
+    );
+    expect(counts).toEqual({});
+  });
+
+  it('matches the email case-insensitively', () => {
+    const counts = countMyCommitsByDay([commit({ authorEmail: 'Adrien@Iglou.EU', authorDate: on(2026, 6, 12) })], q);
+    expect(counts).toEqual({ '20260612': 1 });
+  });
+
+  it('returns an empty map when the reference email is empty', () => {
+    expect(countMyCommitsByDay([commit()], { ...q, myEmail: '  ' })).toEqual({});
   });
 });

@@ -2,8 +2,7 @@
 // Degrades gracefully (returns {}) when git is disabled, absent, or has no email configured.
 import * as vscode from 'vscode';
 import type { API as GitAPI, GitExtension, Commit, Repository } from './git-types';
-import { dayKeyLocal } from '../core/aggregate';
-import { countMyCommitsForDay, localDayBounds, type CommitRecord } from '../core/commits';
+import { countMyCommitsByDay, countMyCommitsForDay, localDayBounds, type CommitRecord } from '../core/commits';
 
 export async function getGitApi(): Promise<GitAPI | undefined> {
   const ext = vscode.extensions.getExtension<GitExtension>('vscode.git');
@@ -40,11 +39,16 @@ function toRecords(commits: readonly Commit[]): CommitRecord[] {
   return records;
 }
 
-/** Per-day commit counts (mine, non-merge) for a folder. Returns {} when git is unavailable. */
+/**
+ * Per-day commit counts (mine, non-merge) for a folder, restricted to commits authored on or after
+ * `sinceMs` (the history window: older commits are never displayed, so they are not counted).
+ * Returns {} when git is unavailable.
+ */
 export async function myCommitCountsByDay(
   api: GitAPI,
   folder: vscode.Uri,
   emailOverride: string,
+  sinceMs = 0,
   maxEntries = 500,
 ): Promise<Record<string, number>> {
   const repo = api.getRepository(folder);
@@ -58,15 +62,45 @@ export async function myCommitCountsByDay(
   } catch {
     return {};
   }
+  return countMyCommitsByDay(toRecords(commits), { myEmail: email, sinceMs });
+}
 
-  const counts: Record<string, number> = {};
-  for (const r of toRecords(commits)) {
-    if (r.parentCount > 1) continue; // skip merges
-    if (r.authorEmail.trim().toLowerCase() !== email) continue;
-    const key = dayKeyLocal(r.authorDate.getTime());
-    counts[key] = (counts[key] ?? 0) + 1;
+/**
+ * Caches the per-day commit counts per repository so the panel does not re-run `git log` on every
+ * refresh (the panel rebuilds ~once a minute while open). The cache is dropped when the repository
+ * state changes (a new commit, amend, rebase, or checkout), the git-side analogue of the file
+ * watcher evicting a changed JSONL file. clear() handles a settings change (e.g. the configured
+ * email) that the git state event would not signal.
+ */
+export class CommitCounts implements vscode.Disposable {
+  private readonly cache = new Map<string, Record<string, number>>();
+  private readonly subs = new Map<string, vscode.Disposable>();
+
+  constructor(private readonly api: GitAPI) {}
+
+  async byDay(folder: vscode.Uri, emailOverride: string, sinceMs: number): Promise<Record<string, number>> {
+    const repo = this.api.getRepository(folder);
+    if (!repo) return {};
+    const key = repo.rootUri.toString();
+    if (!this.subs.has(key)) {
+      this.subs.set(key, repo.state.onDidChange(() => this.cache.delete(key)));
+    }
+    const hit = this.cache.get(key);
+    if (hit) return hit;
+    const counts = await myCommitCountsByDay(this.api, folder, emailOverride, sinceMs);
+    this.cache.set(key, counts);
+    return counts;
   }
-  return counts;
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  dispose(): void {
+    for (const sub of this.subs.values()) sub.dispose();
+    this.subs.clear();
+    this.cache.clear();
+  }
 }
 
 /** Today's commit count (mine), using the shared pure counter. */
