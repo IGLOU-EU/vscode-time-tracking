@@ -7,6 +7,12 @@
 // a browser, a database, or documentation is still work, so the core's idle timeout governs.
 // The real mouse is not exposed by the API. Each activity carries a `kind` so the debug log shows
 // what triggered it.
+//
+// Editor interactions (edit/selection/scroll/navigation) are gated on window focus: an unfocused
+// window cannot receive genuine typing, clicking or scrolling, yet events like visible-ranges still
+// fire from layout reflows (e.g. windows shuffled across screens when a monitor is plugged or
+// unplugged), which would otherwise register as a phantom scroll. Background work (filesystem,
+// tasks, terminal) is NOT gated: writing files or running a build legitimately happens unfocused.
 import * as vscode from 'vscode';
 
 export type ActivityKind =
@@ -43,6 +49,13 @@ function activeFolder(): vscode.Uri | undefined {
 export function registerSignals(context: vscode.ExtensionContext, sinks: SignalSinks): void {
   const now = (): number => Date.now();
 
+  // An editor interaction is only genuine when the window is focused (see the file header). When it
+  // is not, the event is a layout reflow or other side effect, not real work, so it is dropped.
+  const editorActivity = (kind: ActivityKind): void => {
+    if (!vscode.window.state.focused) return;
+    sinks.onActivity(now(), kind);
+  };
+
   // Foreground + edit/selection/scroll/navigation.
   context.subscriptions.push(
     vscode.window.onDidChangeWindowState((state) => sinks.onPresence(state.focused, now())),
@@ -51,20 +64,20 @@ export function registerSignals(context: vscode.ExtensionContext, sinks: SignalS
       if (!active || e.document !== active.document) return; // ignore non-visible docs (logs, SCM)
       if (e.document.uri.scheme !== 'file') return;
       if (e.contentChanges.length === 0) return;
-      sinks.onActivity(now(), 'edit');
+      editorActivity('edit');
     }),
     vscode.window.onDidChangeTextEditorSelection((e) => {
       if (e.textEditor.document.uri.scheme !== 'file') return;
-      sinks.onActivity(now(), 'selection');
+      editorActivity('selection');
     }),
     // Scrolling counts as activity: reading code is work even without typing.
     vscode.window.onDidChangeTextEditorVisibleRanges((e) => {
       if (e.textEditor.document.uri.scheme !== 'file') return;
-      sinks.onActivity(now(), 'scroll');
+      editorActivity('scroll');
     }),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
-      sinks.onActiveFolder(folderOf(editor?.document.uri));
-      if (editor) sinks.onActivity(now(), 'navigation');
+      sinks.onActiveFolder(folderOf(editor?.document.uri)); // project tracking is not focus-gated
+      if (editor) editorActivity('navigation');
     }),
   );
 
