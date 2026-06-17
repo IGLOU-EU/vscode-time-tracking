@@ -3,6 +3,10 @@
 A VSCode/VSCodium extension that tracks your working time automatically,
 designed so you never have to think about it.
 
+## Screenshot
+
+![The history view: monthly totals with month-over-month variation, a 24-hour activity-density curve, a calendar heatmap, and the per-day list with git commit counts](https://gitlab.com/iglou.eu/vscode-time-tracking/-/raw/main/media/screenshot.png)
+
 ## Why
 
 Starting a time tracker by hand means forgetting it half the time, and

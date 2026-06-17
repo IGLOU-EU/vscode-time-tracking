@@ -6,6 +6,17 @@
   "publisher": "iglou-eu",
   "license": "Unlicense",
   "author": "Adrien Kara <contact-vsix@iglou.eu>",
+  "icon": "resources/icon.png",
+  "keywords": [
+    "time tracking",
+    "time tracker",
+    "productivity",
+    "activity",
+    "automatic",
+    "work hours",
+    "timesheet",
+    "focus"
+  ],
   "engines": {
     "vscode": "^1.93.0",
     "node": ">=20.9.0"

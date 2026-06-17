@@ -22,4 +22,7 @@ CONTRIBUTING.md
 *.local*
 **/*.map
 **/*.ts
-# Kept in the .vsix: dist/extension.js, media/**, l10n/**, package.nls*.json, resources/**, README.md, LICENSE, PATENTS, CHANGELOG.md
+resources/icon.svg
+media/screenshot.png
+# Kept in the .vsix: dist/extension.js, media/history.*, l10n/**, package.nls*.json, resources/icon.png, resources/clock.svg, README.md, LICENSE, PATENTS, CHANGELOG.md
+# The README screenshot ships only in the git repo (referenced by absolute raw URL), not in the .vsix.
