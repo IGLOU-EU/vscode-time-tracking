@@ -80,7 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // While idle and counting down toward a pause, show "(out Nm)" = minutes before suspension.
       const countdown = tracker.getCountdown(now);
       const text = countdown
-        ? vscode.l10n.t('{session} (out {minutes}m)', {
+        ? vscode.l10n.t('{session} (out -{minutes}m)', {
             session: formatClock(elapsed),
             minutes: Math.ceil(countdown.remainingMs / 60_000),
           })
