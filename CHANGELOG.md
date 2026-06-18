@@ -5,6 +5,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-06-18
+
+### Fixed
+
+- Activity bar badge tooltip now shows today's rounded tracked-hours count. Hovering the Time
+  Tracking icon previously displayed only "Hours tracked today" without the number shown on the
+  badge.
+
 ## [1.0.1] - 2026-06-17
 
 ### Changed
