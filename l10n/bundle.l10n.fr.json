@@ -7,7 +7,7 @@
   "Today: {hours}h {minutes}m": "Aujourd'hui : {hours} h {minutes} min",
   "Session: {hours}h {minutes}m": "Session : {hours} h {minutes} min",
   "Time tracking: no tracking": "Suivi du temps : pas de decompte",
-  "Hours tracked today": "Heures suivies aujourd'hui",
+  "{count} hours tracked today": "{count} Heures suivies aujourd'hui",
   "History": "Historique",
   "Refresh": "Rafraichir",
   "Open settings": "Ouvrir les parametres",

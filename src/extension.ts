@@ -390,6 +390,6 @@ function historyStrings(): Record<string, string> {
     less: vscode.l10n.t('Less'),
     more: vscode.l10n.t('More'),
     empty: vscode.l10n.t('No tracking data yet.'),
-    hoursToday: vscode.l10n.t('Hours tracked today'),
+    hoursToday: vscode.l10n.t('{count} hours tracked today'),
   };
 }

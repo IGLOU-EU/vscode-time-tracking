@@ -70,7 +70,8 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
     if (!view || !view.visible) return;
     const payload = await this.data.buildPayload();
     void view.webview.postMessage({ type: 'history', payload });
-    view.badge = { value: Math.round(payload.todayHours), tooltip: payload.strings.hoursToday ?? '' };
+    const todayHours = Math.round(payload.todayHours);
+    view.badge = { value: todayHours, tooltip: vscode.l10n.t(payload.strings.hoursToday, { count: todayHours }) };
   }
 
   private html(webview: vscode.Webview): string {
