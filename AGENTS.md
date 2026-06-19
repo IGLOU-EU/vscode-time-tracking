@@ -96,9 +96,14 @@ without explicit human approval, even if a change looks cleaner:
     not design mouse-movement detection.
   - **While focused** the session never pauses on inactivity (thinking and reading count), bounded
     only by the focus safety cap. **Unfocused**, the inactivity grace runs from the moment focus
-    was lost. A running process uses the background timeout. A debug session holds it open.
-  - **Two kinds of limit:** timeouts (inactivity, background) are BILLED as work. Safety caps
-    (focus, debug) are DEDUCTED: a forgotten session is closed at the last real action.
+    was lost, but it is held PROVISIONALLY: past the threshold the session shows as paused and
+    counts down to the focus cap. Coming back (an action, or a focus return then an action) keeps
+    the grace as work. Reaching the cap with no return drops it as a forgotten session. With the
+    focus cap disabled, the grace is simply billed at the threshold (the old behaviour). A running
+    process uses the background timeout. A debug session holds it open.
+  - **Two kinds of limit:** timeouts (inactivity, background) are BILLED as work (the unfocused
+    inactivity grace only if you return before the focus cap). Safety caps (focus, debug) are
+    DEDUCTED: a forgotten session is closed at the last real action.
   - **Manual pause** is the status bar click (a toggle); it resumes on the next targeted activity
     or another click. Day boundary at local midnight.
 - **VSCodium / Open VSX compatibility.** No proprietary dependency, no

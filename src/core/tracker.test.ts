@@ -93,18 +93,117 @@ describe('focused thinking', () => {
 });
 
 describe('losing and regaining focus', () => {
-  it('bills the inactivity grace then pauses (browser/docs is still work)', () => {
+  it('holds the out-grace as paused once the inactivity threshold passes', () => {
+    const { tracker, emitted } = setup();
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1)); // leave the editor -> the grace starts fresh here
+    tracker.tick(T0 + min(31)); // 30 min since leaving -> still eligible
+    tracker.tick(T0 + min(32)); // 31 min > 30 -> hold the grace, no pause and nothing emitted yet
+    expect(tracker.getPhase(T0 + min(32))).toBe('grace');
+    expect(emitted).toEqual([]);
+    expect(tracker.getCountdown(T0 + min(32))).toMatchObject({ reason: 'focus-cap' }); // idle countdown
+  });
+
+  it('an action during the grace keeps it and starts a fresh session', () => {
+    const { tracker, emitted } = setup();
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(32)); // -> grace, graceEnd = T0 + 31
+    tracker.recordActivity(T0 + min(40)); // back to work
+    expect(tracker.getPhase(T0 + min(40))).toBe('active'); // fresh session before the flush closes it
+    tracker.flush(T0 + min(45));
+    // grace [T0..T0+31] kept, the paused gap 31..40 not counted, fresh session 40..45.
+    expect(emitted).toEqual([
+      { start: T0, end: T0 + min(31) },
+      { start: T0 + min(40), end: T0 + min(45) },
+    ]);
+  });
+
+  it('a focus return during the grace keeps it and pauses until an action', () => {
+    const { tracker, emitted } = setup();
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(32)); // -> grace
+    tracker.setPresence(true, T0 + min(40)); // glance back, no real action
+    expect(emitted).toEqual([{ start: T0, end: T0 + min(31) }]); // grace kept
+    expect(tracker.getPhase(T0 + min(40))).toBe('paused');
+    tracker.recordActivity(T0 + min(42)); // a real action resumes
+    expect(tracker.getPhase(T0 + min(42))).toBe('active');
+    tracker.flush(T0 + min(45));
+    expect(emitted).toEqual([
+      { start: T0, end: T0 + min(31) },
+      { start: T0 + min(42), end: T0 + min(45) },
+    ]);
+  });
+
+  it('no return drops the grace at the focus cap (deducted)', () => {
     const { tracker, emitted } = setup();
     const pauses: PauseInfo[] = [];
     tracker.onPaused((p) => pauses.push(p));
     tracker.recordActivity(T0);
     tracker.tick(T0);
-    tracker.setPresence(false, T0 + min(1)); // leave the editor -> the grace starts fresh here
-    tracker.tick(T0 + min(20));
-    tracker.tick(T0 + min(31)); // 30 min since leaving -> still eligible
-    tracker.tick(T0 + min(32)); // 31 min since leaving > 30 -> pause, grace billed
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(32)); // -> grace, silence measured from T0 + 1
+    tracker.tick(T0 + min(60)); // 59 min since leaving, still under the 60 cap
+    expect(tracker.getPhase(T0 + min(60))).toBe('grace');
+    tracker.tick(T0 + min(62)); // 61 min > 60 -> drop the grace
+    expect(emitted).toEqual([{ start: T0, end: T0 + min(1) }]); // only up to the focus leave
+    expect(pauses[0]).toMatchObject({ reason: 'focus-cap', capped: true, deductedMs: min(30) });
+    expect(tracker.getPhase(T0 + min(62))).toBe('idle');
+  });
+
+  it('with the cap disabled, the grace is counted at the threshold (old behaviour)', () => {
+    const { tracker, emitted } = setup({ focusCapMs: 0 });
+    const pauses: PauseInfo[] = [];
+    tracker.onPaused((p) => pauses.push(p));
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(31)); // still eligible
+    tracker.tick(T0 + min(32)); // 31 min > 30 -> pause, grace counted
     expect(emitted).toEqual([{ start: T0, end: T0 + min(31) }]);
     expect(pauses[0]).toMatchObject({ reason: 'inactivity', capped: false, deductedMs: 0 });
+  });
+
+  it('a hand pause during the grace keeps it and parks until an action', () => {
+    const { tracker, emitted } = setup();
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(32)); // -> grace, graceEnd = T0 + 31
+    tracker.pause(T0 + min(35)); // hand pause while held in the grace
+    expect(emitted).toEqual([{ start: T0, end: T0 + min(31) }]); // grace kept
+    expect(tracker.getPhase(T0 + min(35))).toBe('paused');
+    tracker.recordActivity(T0 + min(40)); // a real action resumes with a fresh session
+    expect(tracker.getPhase(T0 + min(40))).toBe('active');
+    tracker.flush(T0 + min(45));
+    expect(emitted).toEqual([
+      { start: T0, end: T0 + min(31) },
+      { start: T0 + min(40), end: T0 + min(45) },
+    ]);
+  });
+
+  it('flushing during the grace keeps it (deactivate / project switch counts the held grace)', () => {
+    const { tracker, emitted } = setup();
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(32)); // -> grace, graceEnd = T0 + 31
+    tracker.flush(T0 + min(35));
+    expect(emitted).toEqual([{ start: T0, end: T0 + min(31) }]); // grace kept on flush
+    expect(tracker.getPhase(T0 + min(35))).toBe('idle'); // unfocused -> idle
+  });
+
+  it('exposes the held grace via getOpenInterval (crash recovery keeps it, end frozen at graceEnd)', () => {
+    const { tracker } = setup();
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(32)); // -> grace, graceEnd = T0 + 31
+    expect(tracker.getOpenInterval(T0 + min(50))).toEqual({ start: T0, end: T0 + min(31) });
   });
 
   it('a focus return keeps an active session alive without any other action', () => {

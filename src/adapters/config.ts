@@ -14,10 +14,15 @@ export interface TimeTrackingConfig {
 
 export function readConfig(): TimeTrackingConfig {
   const c = vscode.workspace.getConfiguration('timeTracking');
+  const idleThresholdMs = c.get<number>('inactivityThresholdMinutes', 30) * 60_000;
+  // The focus cap doubles as the unfocused idle cap and must outlast the out-grace, so the grace
+  // window is well-formed. 0 keeps its "disabled" meaning, any positive value is raised to the
+  // threshold.
+  const rawFocusCapMs = c.get<number>('focusedIdleCapMinutes', 60) * 60_000;
   return {
-    idleThresholdMs: c.get<number>('inactivityThresholdMinutes', 30) * 60_000,
+    idleThresholdMs,
     backgroundTimeoutMs: c.get<number>('backgroundProcessTimeoutMinutes', 30) * 60_000,
-    focusCapMs: c.get<number>('focusedIdleCapMinutes', 60) * 60_000,
+    focusCapMs: rawFocusCapMs > 0 ? Math.max(rawFocusCapMs, idleThresholdMs) : 0,
     debugIdleCapMs: c.get<number>('debugIdleCapHours', 0) * 3_600_000,
     minSessionMs: c.get<number>('minSessionMinutes', 1) * 60_000,
     fontSizePx: c.get<number>('fontSize', 14),

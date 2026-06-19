@@ -10,17 +10,24 @@
 //
 // While the window is FOCUSED, the session never pauses on inactivity (thinking and reading
 // count), bounded only by a long focus safety cap. When focus is LOST, the inactivity grace runs
-// (browser/db/docs is still work). A running process uses the background grace.
+// (browser/db/docs is still work), but it is held PROVISIONALLY in a 'grace' phase (shown as
+// paused, counting down to the focus cap): coming back keeps it as work, reaching the cap with no
+// return drops it as a forgotten session. With the focus cap disabled the grace is simply billed
+// at the threshold (the old, non-provisional behaviour). A running process uses the background
+// grace instead.
 //
 // Silence limits are of two kinds:
-//   timeouts (billed):   inactivity (unfocused), background-timeout. The grace counts as work.
+//   timeouts (billed):   inactivity (unfocused, billed only if you return), background-timeout.
+//                        The grace counts as work.
 //   safety caps (deducted): focus-cap, debug-cap. These guard against a forgotten session, so the
 //                           cap duration is removed from the recorded time (closed at the last
 //                           real action) to avoid billing an oversight.
 
 import { splitAtMidnight, localMidnightOf, type Interval } from './intervals';
 
-export type TrackPhase = 'idle' | 'pending' | 'active' | 'paused';
+// 'grace' is the unfocused out-grace held provisionally after the inactivity threshold: shown as
+// paused, it counts down toward the focus cap. Coming back keeps the grace, the cap drops it.
+export type TrackPhase = 'idle' | 'pending' | 'active' | 'grace' | 'paused';
 export type PauseReason = 'inactivity' | 'background-timeout' | 'focus-cap' | 'debug-cap';
 
 export interface PauseInfo {
@@ -100,6 +107,7 @@ export function createTracker(config: TrackerConfig): Tracker {
   let lastActivityAt = Number.NEGATIVE_INFINITY;
   let openStart = 0;
   let lastActiveAt = 0;
+  let graceEnd = 0; // end of the provisionally-held out-grace, valid only while phase === 'grace'
   let countdownAnnounced = false;
   const listeners: Array<(iv: Interval) => void> = [];
   const pauseListeners: Array<(info: PauseInfo) => void> = [];
@@ -142,6 +150,13 @@ export function createTracker(config: TrackerConfig): Tracker {
 
   return {
     recordActivity(at) {
+      if (phase === 'grace') {
+        closeOpen(graceEnd); // keep the provisional out-grace, the paused gap is not counted
+        if (at > lastActivityAt) lastActivityAt = at;
+        manualPaused = false;
+        startActive(at, at); // fresh session from the action
+        return;
+      }
       if (at > lastActivityAt) lastActivityAt = at;
       countdownAnnounced = false; // new activity re-arms the countdown
       manualPaused = false; // a targeted action resumes from a manual pause
@@ -158,6 +173,16 @@ export function createTracker(config: TrackerConfig): Tracker {
       // at the editor for info keeps it alive, and time spent thinking under focus does not eat
       // into the inactivity grace once you leave for the DB/browser. From rest, a stray focus is
       // not enough to start billing: it only moves idle -> pending (a real action confirms).
+      if (phase === 'grace') {
+        // A focus return disarms the idle timer and keeps the grace, leaving the session paused
+        // until a real action resumes it. A stray unfocus just keeps holding.
+        if (focused) {
+          closeOpen(graceEnd);
+          manualPaused = true;
+          phase = 'idle';
+        }
+        return;
+      }
       if (phase === 'active') {
         if (wasFocused !== focused && at > lastActivityAt) lastActivityAt = at;
       } else if (focused && phase === 'idle') {
@@ -173,6 +198,12 @@ export function createTracker(config: TrackerConfig): Tracker {
       terminalRunning = running;
     },
     pause(at) {
+      if (phase === 'grace') {
+        closeOpen(graceEnd); // a hand pause during the grace keeps it, like a focus return
+        manualPaused = true;
+        phase = 'idle';
+        return;
+      }
       // A session this short that the user stops by hand is noise, not work: discard it unbilled
       // and go back to awaiting rather than paused.
       if (phase === 'active' && at - openStart < minSessionMs) {
@@ -195,6 +226,16 @@ export function createTracker(config: TrackerConfig): Tracker {
 
       if (phase === 'active') {
         if (!eligible(now)) {
+          // Out-grace elapsed unfocused: hold it provisionally and run the focus cap as the idle
+          // timer. Coming back before the cap keeps the grace, the cap drops it (deducted). The
+          // config adapter guarantees focusCapMs >= idleThresholdMs when set, so graceEnd never
+          // outlasts the cap (a smaller cap would drop the grace before it is even reached).
+          if (!windowFocused && !continuous() && Number.isFinite(cap(focusCapMs))) {
+            graceEnd = silenceSince() + idleThresholdMs;
+            phase = 'grace';
+            countdownAnnounced = false;
+            return;
+          }
           const k = binding();
           // Safety caps close at the last real action (deducting the whole forgotten tail, which is
           // at least the cap); billed timeouts close at the last active tick (the grace counts).
@@ -228,11 +269,36 @@ export function createTracker(config: TrackerConfig): Tracker {
         return;
       }
 
+      if (phase === 'grace') {
+        const idleCapMs = cap(focusCapMs);
+        if (now - silenceSince() > idleCapMs) {
+          // The idle timer expired with no return: drop the provisional grace, keeping only up to
+          // the last real action (the focus-cap deduction applied to the unfocused tail).
+          if (pauseListeners.length > 0) {
+            const deductedMs = Math.max(0, graceEnd - silenceSince());
+            const silentMs = now - silenceSince();
+            for (const cb of pauseListeners) {
+              cb({ reason: 'focus-cap', capped: true, silentMs, thresholdMs: idleCapMs, deductedMs, at: now });
+            }
+          }
+          closeOpen(silenceSince()); // excludes the dropped grace
+          phase = 'idle';
+          return;
+        }
+        if (!countdownAnnounced) {
+          const remainingMs = Math.max(0, idleCapMs - (now - silenceSince()));
+          for (const cb of countdownListeners) cb({ reason: 'focus-cap', thresholdMs: idleCapMs, remainingMs, at: now });
+          countdownAnnounced = true;
+        }
+        return;
+      }
+
       // pending or idle: a debug/terminal process starts a session on its own.
       if (continuous()) startActive(now, now);
     },
     flush(now) {
       if (phase === 'active') closeOpen(now);
+      else if (phase === 'grace') closeOpen(graceEnd); // keep the provisional grace on a flush
       // A flush closes the interval but does not end the user's presence, so a still-focused window
       // returns to pending (awaiting confirmation), not idle.
       phase = windowFocused ? 'pending' : 'idle';
@@ -244,6 +310,10 @@ export function createTracker(config: TrackerConfig): Tracker {
       return phase === 'active' ? Math.max(0, now - openStart) : 0;
     },
     getCountdown(now) {
+      if (phase === 'grace') {
+        const idleCapMs = cap(focusCapMs);
+        return { reason: 'focus-cap', remainingMs: Math.max(0, idleCapMs - (now - silenceSince())) };
+      }
       if (phase !== 'active') return null;
       const silent = now - silenceSince();
       if (silent < MIN_COUNTDOWN_SILENCE_MS) return null; // still working, not counting down
@@ -252,7 +322,9 @@ export function createTracker(config: TrackerConfig): Tracker {
       return { reason: k.reason, remainingMs: Math.max(0, k.ms - silent) };
     },
     getOpenInterval(now) {
-      return phase === 'active' ? { start: openStart, end: Math.max(openStart, now) } : null;
+      if (phase === 'active') return { start: openStart, end: Math.max(openStart, now) };
+      if (phase === 'grace') return { start: openStart, end: graceEnd }; // crash keeps the grace
+      return null;
     },
     onIntervalClosed(cb) {
       listeners.push(cb);

@@ -74,17 +74,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       status.showPaused(vscode.l10n.t('Paused'));
       return;
     }
+    if (phase === 'grace') {
+      // Unfocused out-grace held provisionally: paused look with the idle countdown to the cap.
+      const countdown = tracker.getCountdown(now);
+      const minutes = countdown ? Math.ceil(countdown.remainingMs / 60_000) : 0;
+      status.showPaused(`${vscode.l10n.t('Paused')} (idle -${minutes}m)`);
+      return;
+    }
     if (phase === 'active') {
       const elapsed = tracker.currentOpenMs(now);
       const { hours, minutes } = hoursMinutes(elapsed);
-      // While idle and counting down toward a pause, show "(out Nm)" = minutes before suspension.
+      // While idle and counting down toward a pause, show the minutes before suspension: "out" for
+      // the unfocused grace, "idle" toward a safety cap (focus or debug).
       const countdown = tracker.getCountdown(now);
-      const text = countdown
-        ? vscode.l10n.t('{session} (out -{minutes}m)', {
-            session: formatClock(elapsed),
-            minutes: Math.ceil(countdown.remainingMs / 60_000),
-          })
-        : formatClock(elapsed);
+      let text: string;
+      if (!countdown) {
+        text = formatClock(elapsed);
+      } else {
+        const mins = Math.ceil(countdown.remainingMs / 60_000);
+        const idle = countdown.reason === 'focus-cap' || countdown.reason === 'debug-cap';
+        text = idle
+          ? vscode.l10n.t('{session} (idle -{minutes}m)', { session: formatClock(elapsed), minutes: mins })
+          : vscode.l10n.t('{session} (out -{minutes}m)', { session: formatClock(elapsed), minutes: mins });
+      }
       status.showRunning(text, vscode.l10n.t('Session: {hours}h {minutes}m', { hours, minutes }));
       return;
     }
