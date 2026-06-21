@@ -92,16 +92,16 @@ without explicit human approval, even if a change looks cleaner:
     session immediately, resets the idle timer, and resumes a manual pause.
   - **Presence (window focus)** keeps an ALREADY-active session alive (a deliberate glance at the
     editor is work) and resets the idle timer on any focus change. From rest, focus alone does NOT
-    bill: it stays "pending" until a real action. The real mouse is not exposed by the API, so do
+    count: it stays "pending" until a real action. The real mouse is not exposed by the API, so do
     not design mouse-movement detection.
   - **While focused** the session never pauses on inactivity (thinking and reading count), bounded
     only by the focus safety cap. **Unfocused**, the inactivity grace runs from the moment focus
     was lost, but it is held PROVISIONALLY: past the threshold the session shows as paused and
     counts down to the focus cap. Coming back (an action, or a focus return then an action) keeps
     the grace as work. Reaching the cap with no return drops it as a forgotten session. With the
-    focus cap disabled, the grace is simply billed at the threshold (the old behaviour). A running
+    focus cap disabled, the grace is simply counted at the threshold (the old behaviour). A running
     process uses the background timeout. A debug session holds it open.
-  - **Two kinds of limit:** timeouts (inactivity, background) are BILLED as work (the unfocused
+  - **Two kinds of limit:** timeouts (inactivity, background) are COUNTED as work (the unfocused
     inactivity grace only if you return before the focus cap). Safety caps (focus, debug) are
     DEDUCTED: a forgotten session is closed at the last real action.
   - **Manual pause** is the status bar click (a toggle); it resumes on the next targeted activity

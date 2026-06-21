@@ -3,7 +3,7 @@
 // Phases:
 //   idle    -> nothing tracked.
 //   pending -> the window is focused but no targeted activity has happened yet. Shown as
-//              "awaiting confirmation". Presence alone is NEVER billed: it stays pending, with
+//              "awaiting confirmation". Presence alone is NEVER counted: it stays pending, with
 //              zero time counted, until a real action confirms it (or focus is lost).
 //   active  -> tracking, entered by a targeted activity (keystroke, click, selection, scroll,
 //              file write) or by a debug/terminal process.
@@ -12,16 +12,16 @@
 // count), bounded only by a long focus safety cap. When focus is LOST, the inactivity grace runs
 // (browser/db/docs is still work), but it is held PROVISIONALLY in a 'grace' phase (shown as
 // paused, counting down to the focus cap): coming back keeps it as work, reaching the cap with no
-// return drops it as a forgotten session. With the focus cap disabled the grace is simply billed
+// return drops it as a forgotten session. With the focus cap disabled the grace is simply counted
 // at the threshold (the old, non-provisional behaviour). A running process uses the background
 // grace instead.
 //
 // Silence limits are of two kinds:
-//   timeouts (billed):   inactivity (unfocused, billed only if you return), background-timeout.
+//   timeouts (counted):  inactivity (unfocused, counted only if you return), background-timeout.
 //                        The grace counts as work.
 //   safety caps (deducted): focus-cap, debug-cap. These guard against a forgotten session, so the
 //                           cap duration is removed from the recorded time (closed at the last
-//                           real action) to avoid billing an oversight.
+//                           real action) to avoid counting an oversight.
 
 import { splitAtMidnight, localMidnightOf, type Interval } from './intervals';
 
@@ -35,7 +35,7 @@ export interface PauseInfo {
   readonly capped: boolean; // a safety cap (focus/debug): its duration is deducted
   readonly silentMs: number; // silence since the last action (or session start)
   readonly thresholdMs: number; // the limit that was crossed
-  readonly deductedMs: number; // time removed from the recorded session (0 for billed timeouts)
+  readonly deductedMs: number; // time removed from the recorded session (0 for counted timeouts)
   readonly at: number;
 }
 
@@ -53,8 +53,8 @@ export interface DiscardInfo {
 }
 
 export interface TrackerConfig {
-  idleThresholdMs: number; // unfocused inactivity grace (billed)
-  backgroundTimeoutMs: number; // running process without interaction (billed)
+  idleThresholdMs: number; // unfocused inactivity grace (counted)
+  backgroundTimeoutMs: number; // running process without interaction (counted)
   focusCapMs: number; // focused-but-no-activity safety cap (deducted). 0 = never pause while focused
   debugIdleCapMs: number; // debug-without-interaction safety cap (deducted). 0 = never
   minSessionMs: number; // a hand-paused session shorter than this is discarded as noise. 0 = keep all
@@ -172,7 +172,7 @@ export function createTracker(config: TrackerConfig): Tracker {
       // already-active session it resets the idle timer, so the new grace starts fresh: glancing
       // at the editor for info keeps it alive, and time spent thinking under focus does not eat
       // into the inactivity grace once you leave for the DB/browser. From rest, a stray focus is
-      // not enough to start billing: it only moves idle -> pending (a real action confirms).
+      // not enough to start counting: it only moves idle -> pending (a real action confirms).
       if (phase === 'grace') {
         // A focus return disarms the idle timer and keeps the grace, leaving the session paused
         // until a real action resumes it. A stray unfocus just keeps holding.
@@ -188,7 +188,7 @@ export function createTracker(config: TrackerConfig): Tracker {
       } else if (focused && phase === 'idle') {
         phase = 'pending';
       } else if (!focused && phase === 'pending') {
-        phase = 'idle'; // left without acting: nothing billed
+        phase = 'idle'; // left without acting: nothing counted
       }
     },
     setDebugActive(active) {
@@ -204,7 +204,7 @@ export function createTracker(config: TrackerConfig): Tracker {
         phase = 'idle';
         return;
       }
-      // A session this short that the user stops by hand is noise, not work: discard it unbilled
+      // A session this short that the user stops by hand is noise, not work: discard it uncounted
       // and go back to awaiting rather than paused.
       if (phase === 'active' && at - openStart < minSessionMs) {
         for (const cb of discardListeners) cb({ ms: at - openStart, thresholdMs: minSessionMs, at });
@@ -238,7 +238,7 @@ export function createTracker(config: TrackerConfig): Tracker {
           }
           const k = binding();
           // Safety caps close at the last real action (deducting the whole forgotten tail, which is
-          // at least the cap); billed timeouts close at the last active tick (the grace counts).
+          // at least the cap); counted timeouts close at the last active tick (the grace counts).
           const closeAt = k.capped ? silenceSince() : lastActiveAt;
           if (pauseListeners.length > 0) {
             const silentMs = now - silenceSince();

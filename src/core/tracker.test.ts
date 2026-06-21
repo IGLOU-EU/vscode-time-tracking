@@ -27,7 +27,7 @@ function setup(overrides: Partial<Parameters<typeof createTracker>[0]> = {}): {
 }
 
 describe('presence and confirmation', () => {
-  it('presence alone stays pending and bills nothing', () => {
+  it('presence alone stays pending and counts nothing', () => {
     const { tracker, emitted } = setup();
     tracker.setPresence(true, T0);
     tracker.tick(T0);
@@ -77,7 +77,7 @@ describe('focused thinking', () => {
     expect(tracker.getPhase(T0 + min(45))).toBe('active');
   });
 
-  it('on the focus cap, deducts the forgotten tail and bills only up to the last real action', () => {
+  it('on the focus cap, deducts the forgotten tail and counts only up to the last real action', () => {
     const { tracker, emitted } = setup();
     const pauses: PauseInfo[] = [];
     tracker.onPaused((p) => pauses.push(p));
@@ -87,7 +87,7 @@ describe('focused thinking', () => {
     tracker.tick(T0 + min(20));
     tracker.tick(T0 + min(50)); // focused-idle, still under cap
     tracker.tick(T0 + min(81)); // 61 min since last action > 60 min cap -> pause and deduct
-    expect(emitted).toEqual([{ start: T0, end: T0 + min(20) }]); // forgotten 60 min not billed
+    expect(emitted).toEqual([{ start: T0, end: T0 + min(20) }]); // forgotten 60 min not counted
     expect(pauses[0]).toMatchObject({ reason: 'focus-cap', capped: true, thresholdMs: min(60), deductedMs: min(30) });
   });
 });
@@ -240,7 +240,7 @@ describe('processes', () => {
 });
 
 describe('manual pause, resume, ignore', () => {
-  it('pause bills the session and reports paused; a later activity resumes automatically', () => {
+  it('pause counts the session and reports paused; a later activity resumes automatically', () => {
     const { tracker, emitted } = setup();
     tracker.recordActivity(T0);
     tracker.tick(T0);
