@@ -20,6 +20,10 @@ import { createLogger } from './adapters/logger';
 const TICK_MS = 15_000;
 const CHECKPOINT_MS = 60_000;
 const RECOVERY_STALE_MS = 5 * 60_000;
+// The periodic ticks fire at most TICK_MS apart while the host runs. A gap far beyond that means
+// the process was frozen (OS sleep, closed lid): the wall clock advanced with nobody present, so
+// that span is not work and must not be counted as active time.
+const SUSPEND_GAP_MS = 90_000;
 
 let onDeactivate: (() => Promise<void>) | undefined;
 
@@ -51,6 +55,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let commitCounts: CommitCounts | undefined;
   let watcher: vscode.Disposable | undefined;
   let lastActivityTickAt = 0; // coalesces bursty activity (one keystroke fires 3 events)
+  let lastTickAt = 0; // wall-clock of the last time we advanced the tracker, to spot a host suspend
 
   // History data port: the pure model, formatted with localized labels.
   const dataPort: HistoryDataPort = { buildPayload: () => buildPayload() };
@@ -136,7 +141,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   tracker.onPaused((info) => {
     logger.log('pause', {
       reason: info.reason, // inactivity | background-timeout | focus-cap | debug-cap
-      capped: info.capped, // a safety cap: deducted, not billed
+      capped: info.capped, // a safety cap: deducted, not counted
       idleMinutes: toMin(info.silentMs),
       thresholdMinutes: toMin(info.thresholdMs),
       deductedMinutes: toMin(info.deductedMs),
@@ -161,6 +166,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     });
   });
 
+  // Single funnel for advancing the tracker's clock. A tick landing far past the cadence means the
+  // host was suspended (sleep / closed lid) while the timers were frozen: close the open session at
+  // the last live instant (flush keeps presence) so the slept span is not counted, then tick now.
+  function advance(now: number): void {
+    if (lastTickAt !== 0 && now - lastTickAt > SUSPEND_GAP_MS) {
+      logger.log('suspend', { gapMinutes: toMin(now - lastTickAt) });
+      tracker.flush(lastTickAt);
+    }
+    lastTickAt = now;
+    tracker.tick(now);
+  }
+
   registerSignals(context, {
     onActivity: (now, kind) => {
       // Always record the activity instant (keeps the idle timer exact), but coalesce the
@@ -170,27 +187,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (now - lastActivityTickAt < 1000) return;
       lastActivityTickAt = now;
       logger.log('activity', { kind });
-      tracker.tick(now);
+      advance(now);
       refreshStatus(now);
     },
     onPresence: (focused, now) => {
       logger.log('presence', { focused });
       tracker.setPresence(focused, now);
-      tracker.tick(now);
+      advance(now);
       refreshStatus(now);
     },
     onDebugActive: (active) => {
       logger.log('debug', { active });
       tracker.setDebugActive(active);
       const now = Date.now();
-      tracker.tick(now);
+      advance(now);
       refreshStatus(now);
     },
     onProcessRunning: (running) => {
       logger.log('process', { running });
       tracker.setTerminalRunning(running);
       const now = Date.now();
-      tracker.tick(now);
+      advance(now);
       refreshStatus(now);
     },
     onActiveFolder: (folder) => {
@@ -208,6 +225,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // and starts tracking now.
     vscode.commands.registerCommand('timeTracking.toggle', () => {
       const now = Date.now();
+      advance(now); // resolve any pending suspend so a slept session is not paused-and-counted here
       if (tracker.getPhase(now) === 'active') {
         tracker.pause(now);
         if (currentProjectId) void storage.writeOpenMarker(currentProjectId, null, now);
@@ -218,14 +236,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       refreshHistory();
     }),
     vscode.commands.registerCommand('timeTracking.pause', () => {
-      tracker.pause(Date.now());
-      if (currentProjectId) void storage.writeOpenMarker(currentProjectId, null, Date.now());
-      refreshStatus(Date.now());
+      const now = Date.now();
+      advance(now); // close any slept span first, so the pause does not count it
+      tracker.pause(now);
+      if (currentProjectId) void storage.writeOpenMarker(currentProjectId, null, now);
+      refreshStatus(now);
       refreshHistory();
     }),
     vscode.commands.registerCommand('timeTracking.resume', () => {
       tracker.resume();
-      tracker.tick(Date.now());
+      advance(Date.now());
       refreshStatus(Date.now());
     }),
     vscode.commands.registerCommand('timeTracking.ignoreSession', () => {
@@ -255,15 +275,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
-  // Periodic tick (idle detection) and checkpoint (crash-recovery marker).
+  // Periodic tick (idle + suspend detection) and checkpoint (crash-recovery marker).
   const tickTimer = setInterval(() => {
     const now = Date.now();
-    tracker.tick(now);
+    advance(now);
     refreshStatus(now);
   }, TICK_MS);
   const checkpointTimer = setInterval(() => {
     const now = Date.now();
-    tracker.tick(now);
+    advance(now);
     if (!currentProjectId) return;
     void storage.writeOpenMarker(currentProjectId, tracker.getOpenInterval(now), now);
   }, CHECKPOINT_MS);
