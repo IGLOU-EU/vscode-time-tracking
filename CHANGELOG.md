@@ -5,6 +5,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-21
+
+### Added
+
+- The History panel now lists each day's work sessions with their time ranges (for example
+  "Session 1: 09:00-11:00 · Session 2: 14:00-15:30"). Every day with tracked time shows its
+  sessions. Previously the ranges appeared only when several windows had worked the same day.
+
+### Fixed
+
+- Time spent while the computer is asleep is no longer counted. After an OS suspend (sleep or a
+  closed lid) the session closes at the last moment before the machine froze, instead of counting
+  the whole away period as active time.
+
 ## [1.0.2] - 2026-06-18
 
 ### Fixed
