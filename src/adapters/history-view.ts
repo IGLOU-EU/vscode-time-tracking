@@ -17,7 +17,7 @@ export interface HistoryPayload {
     label: string;
     hoursLabel: string;
     commits: number;
-    windowsLabel?: string;
+    sessionsLabel?: string;
   }>;
   strings: Record<string, string>;
   todayHours: number;

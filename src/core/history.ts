@@ -50,6 +50,8 @@ export interface HistoryDay {
   readonly date: string; // YYYYMMDD
   readonly seconds: number;
   readonly commits: number;
+  /** The day's contiguous work blocks (cross-window union), ordered. Each one is a session. */
+  readonly sessions: Interval[];
   /** Per-window detail. Length > 1 means several windows worked the project that day. */
   readonly windows: WindowBreakdown[];
 }
@@ -165,12 +167,18 @@ export function buildHistoryModel(
   const perDay = aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end })));
   const breakdown = breakdownByDay(tagged);
 
-  const days: HistoryDay[] = perDay.map((d) => ({
-    date: d.date,
-    seconds: Math.round(d.ms / 1000),
-    commits: commitsByDay[d.date] ?? 0,
-    windows: breakdown.get(d.date) ?? [],
-  }));
+  const days: HistoryDay[] = perDay.map((d) => {
+    const windows = breakdown.get(d.date) ?? [];
+    return {
+      date: d.date,
+      seconds: Math.round(d.ms / 1000),
+      commits: commitsByDay[d.date] ?? 0,
+      // The displayed sessions are the cross-window union, so they match the day total and
+      // overlapping windows never show as two separate sessions.
+      sessions: mergeIntervals(windows.flatMap((w) => w.ranges)),
+      windows,
+    };
+  });
 
   const byDay = new Map<string, number>(days.map((d) => [d.date, d.seconds]));
 

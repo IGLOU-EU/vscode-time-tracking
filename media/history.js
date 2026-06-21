@@ -61,10 +61,10 @@
       : '';
 
     const dayRows = days
-      .map((/** @type {{ label?: string, date: string, hoursLabel?: string, commits: number, windowsLabel?: string }} */ d) => {
-        const windows = d.windowsLabel ? `<div class="tt-windows">${esc(d.windowsLabel)}</div>` : '';
+      .map((/** @type {{ label?: string, date: string, hoursLabel?: string, commits: number, sessionsLabel?: string }} */ d) => {
+        const sessions = d.sessionsLabel ? `<div class="tt-sessions">${esc(d.sessionsLabel)}</div>` : '';
         return (
-          `<li class="tt-day-item${d.windowsLabel ? ' tt-clickable' : ''}">` +
+          `<li class="tt-day-item${d.sessionsLabel ? ' tt-clickable' : ''}">` +
           `<div class="tt-day">` +
           `<span class="tt-day-date">${esc(d.label || d.date)}</span>` +
           `<span class="tt-day-right">` +
@@ -72,7 +72,7 @@
           `<span class="tt-day-hours">${esc(d.hoursLabel || '')}</span>` +
           `</span>` +
           `</div>` +
-          windows +
+          sessions +
           `</li>`
         );
       })

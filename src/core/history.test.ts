@@ -89,6 +89,33 @@ describe('buildHistoryModel', () => {
     expect(model.days[0].windows).toHaveLength(1);
     expect(model.days[0].windows[0].ranges).toEqual([{ start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12) }]);
   });
+
+  it('reports a single session for one continuous block', () => {
+    const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 12))];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].sessions).toEqual([{ start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12) }]);
+  });
+
+  it('lists one session per contiguous work block, with the gap between them kept', () => {
+    const intervals = [
+      tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)), // morning
+      tagged('w1', at(2026, 6, 16, 14), at(2026, 6, 16, 15)), // afternoon: a real gap -> a second session
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11) },
+      { start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15) },
+    ]);
+  });
+
+  it('merges overlapping sessions across windows into the day work blocks (no double session)', () => {
+    const intervals = [
+      tagged('w1', at(2026, 6, 16, 14), at(2026, 6, 16, 16)),
+      tagged('w2', at(2026, 6, 16, 15), at(2026, 6, 16, 17)),
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].sessions).toEqual([{ start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 17) }]);
+  });
 });
 
 describe('historyWindowStartMs', () => {

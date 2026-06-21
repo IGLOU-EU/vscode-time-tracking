@@ -350,12 +350,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           label: dayLabel(d.date),
           hoursLabel: formatClock(d.seconds * 1000),
           commits: d.commits,
-          // One sub-line listing each session's ranges when several sessions worked that day.
-          windowsLabel:
-            d.windows.length > 1
-              ? d.windows
-                  .map((w, i) => `${strings.session} ${i + 1}: ${w.ranges.map((r) => `${hhmm(r.start)}-${hhmm(r.end)}`).join(', ')}`)
-                  .join(' · ')
+          // One sub-line listing each work session's time range, e.g.
+          // "Session 1: 09:00-11:00 · Session 2: 14:00-15:30".
+          sessionsLabel:
+            d.sessions.length > 0
+              ? d.sessions.map((r, i) => `${strings.session} ${i + 1}: ${hhmm(r.start)}-${hhmm(r.end)}`).join(' · ')
               : undefined,
         })),
       strings,

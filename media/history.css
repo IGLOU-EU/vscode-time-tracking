@@ -262,7 +262,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.tt-windows {
+.tt-sessions {
   margin: 2px 0 0 12px;
   font-size: var(--tt-fs-small);
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
@@ -271,12 +271,12 @@ body {
   white-space: nowrap;
 }
 
-/* Click a day with several sessions to expand its full breakdown. */
+/* Click a day with several sessions to expand the full list of ranges. */
 .tt-day-item.tt-clickable {
   cursor: pointer;
 }
 
-.tt-day-item.tt-expanded .tt-windows {
+.tt-day-item.tt-expanded .tt-sessions {
   white-space: normal;
 }
 
