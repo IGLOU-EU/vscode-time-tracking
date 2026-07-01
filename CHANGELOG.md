@@ -5,6 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-01
+
+### Added
+
+- Add tracked time by hand from the History panel. A new "+" action opens a form where you pick a
+  reason (from a configurable preset list or free text), a date, and a start and end time. The
+  entry counts exactly like a tracked session and never double counts when it overlaps existing
+  time. An entry whose end is earlier than its start is treated as a session crossing midnight.
+- Export a month of tracked time to a CSV file. A new export action lets you choose the month
+  (only those with data, the previous month by default), the rows (per day grouped by reason, or
+  per session), and the output file. The columns, separator, date format, project name and the
+  reason given to plain editor time are all configurable in the settings.
+
+### Changed
+
+- The History panel toolbar now uses the native editor icons.
+
 ## [1.1.0] - 2026-06-21
 
 ### Added

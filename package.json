@@ -2,7 +2,7 @@
   "name": "time-tracking",
   "displayName": "%ext.displayName%",
   "description": "%ext.description%",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "iglou-eu",
   "license": "Unlicense",
   "author": "Adrien Kara <contact-vsix@iglou.eu>",
