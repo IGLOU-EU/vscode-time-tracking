@@ -14,6 +14,8 @@ export interface StoredInterval {
   readonly windowId: string;
   readonly start: number;
   readonly end: number;
+  /** Label of a manually added entry (the chosen reason). Absent for auto-tracked intervals. */
+  readonly reason?: string;
 }
 
 /** How a day data file should be treated when reading the history. */
@@ -67,6 +69,7 @@ export function isStoredInterval(x: unknown): x is StoredInterval {
   if (typeof r.windowId !== 'string') return false;
   if (typeof r.start !== 'number' || typeof r.end !== 'number') return false;
   if (r.end < r.start) return false;
+  if (r.reason !== undefined && typeof r.reason !== 'string') return false;
   return true;
 }
 
@@ -75,7 +78,9 @@ export function parseIntervals(text: string): StoredInterval[] {
   return parseJsonl(text).filter(isStoredInterval);
 }
 
-/** Stamp a raw interval with the schema version and the owning window. */
-export function toStoredInterval(windowId: string, iv: Interval): StoredInterval {
-  return { v: SCHEMA_VERSION, windowId, start: iv.start, end: iv.end };
+/** Stamp a raw interval with the schema version and the owning window. A non-empty reason marks a
+ * manually added entry; it is omitted entirely for auto-tracked intervals so their shape is unchanged. */
+export function toStoredInterval(windowId: string, iv: Interval, reason?: string): StoredInterval {
+  const base = { v: SCHEMA_VERSION, windowId, start: iv.start, end: iv.end };
+  return reason ? { ...base, reason } : base;
 }

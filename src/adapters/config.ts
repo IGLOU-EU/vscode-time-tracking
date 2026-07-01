@@ -1,5 +1,6 @@
 // Adapter: reads the timeTracking settings and converts them into core units (ms).
 import * as vscode from 'vscode';
+import { truncateReason } from '../core/manual-entry';
 
 export interface TimeTrackingConfig {
   readonly idleThresholdMs: number;
@@ -10,7 +11,12 @@ export interface TimeTrackingConfig {
   readonly fontSizePx: number; // History panel base font size in px. 0 = follow the editor font size
   readonly gitUserEmail: string;
   readonly debugLogging: boolean;
+  readonly manualReasons: readonly string[]; // preset reasons offered when adding time by hand
 }
+
+// Sensible defaults for a manual entry's reason. Editable in settings; "Other" (free text) is always
+// offered on top of these by the entry flow.
+const DEFAULT_MANUAL_REASONS = ['Meeting', 'Code review', 'Planning', 'Documentation', 'Support'];
 
 export function readConfig(): TimeTrackingConfig {
   const c = vscode.workspace.getConfiguration('timeTracking');
@@ -28,6 +34,10 @@ export function readConfig(): TimeTrackingConfig {
     fontSizePx: c.get<number>('fontSize', 14),
     gitUserEmail: c.get<string>('gitUserEmail', '').trim(),
     debugLogging: c.get<boolean>('debugLogging', false),
+    // Truncate each preset as the setting is ingested, so the list shown is never over-long even
+    // before the stored setting is rewritten. Capitalization is applied later, when a time entry is
+    // saved, not to the user's setting value.
+    manualReasons: c.get<string[]>('manualReasons', DEFAULT_MANUAL_REASONS).map(truncateReason).filter(Boolean),
   };
 }
 

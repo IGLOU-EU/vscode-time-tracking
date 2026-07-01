@@ -64,6 +64,11 @@ describe('isStoredInterval', () => {
   it('rejects an interval whose end precedes its start', () => {
     expect(isStoredInterval({ v: 1, windowId: 'w1', start: 20, end: 10 })).toBe(false);
   });
+
+  it('accepts an optional string reason and rejects a mistyped one', () => {
+    expect(isStoredInterval({ v: 1, windowId: 'w1', start: 10, end: 20, reason: 'Meeting' })).toBe(true);
+    expect(isStoredInterval({ v: 1, windowId: 'w1', start: 10, end: 20, reason: 5 })).toBe(false);
+  });
 });
 
 describe('parseIntervals', () => {
@@ -88,6 +93,15 @@ describe('toStoredInterval', () => {
       start: 5,
       end: 9,
     });
+  });
+
+  it('omits the reason field for an auto-tracked interval', () => {
+    expect(toStoredInterval('w7', { start: 5, end: 9 })).not.toHaveProperty('reason');
+    expect(toStoredInterval('w7', { start: 5, end: 9 }, '')).not.toHaveProperty('reason');
+  });
+
+  it('carries a non-empty reason for a manual entry', () => {
+    expect(toStoredInterval('w7', { start: 5, end: 9 }, 'Meeting')).toMatchObject({ reason: 'Meeting' });
   });
 });
 

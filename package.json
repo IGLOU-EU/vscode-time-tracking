@@ -167,6 +167,23 @@
           "scope": "machine-overridable",
           "order": 7,
           "markdownDescription": "%config.debugLogging.desc%"
+        },
+        "timeTracking.manualReasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "default": [
+            "Meeting",
+            "Code review",
+            "Planning",
+            "Documentation",
+            "Support"
+          ],
+          "scope": "machine-overridable",
+          "order": 8,
+          "markdownDescription": "%config.manualReasons.desc%"
         }
       }
     }

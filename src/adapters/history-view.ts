@@ -20,15 +20,28 @@ export interface HistoryPayload {
     sessionsLabel?: string;
   }>;
   strings: Record<string, string>;
+  manualReasons: string[]; // preset reasons for the add-time form
   todayHours: number;
   fontSizePx: number; // base font size for the panel in px. 0 = follow the editor font size
 }
 
-export interface HistoryDataPort {
-  buildPayload(): Promise<HistoryPayload>;
+/** Raw field values from the add-time form, validated by the core on the host side. */
+export interface ManualEntryInput {
+  reason: string;
+  date: string;
+  start: string;
+  end: string;
 }
 
-type InboundMessage = { type: 'ready' | 'refresh' | 'openSettings' };
+export interface HistoryDataPort {
+  buildPayload(): Promise<HistoryPayload>;
+  /** Validate and store a manual entry. Returns a localized error message, or null on success. */
+  submitManualEntry(input: ManualEntryInput): Promise<string | null>;
+}
+
+type InboundMessage =
+  | { type: 'ready' | 'refresh' | 'openSettings' }
+  | ({ type: 'submitEntry' } & ManualEntryInput);
 
 export class HistoryViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'timeTracking.historyView'; // must match contributes.views id
@@ -49,6 +62,14 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
     const sub = view.webview.onDidReceiveMessage((msg: InboundMessage) => {
       if (msg.type === 'ready' || msg.type === 'refresh') {
         void this.refresh();
+        return;
+      }
+      if (msg.type === 'submitEntry') {
+        const { reason, date, start, end } = msg;
+        void this.data.submitManualEntry({ reason, date, start, end }).then((error) => {
+          // Tell the form to show the error and stay open, or to close on success.
+          void this.view?.webview.postMessage({ type: error ? 'entryError' : 'entrySaved', message: error });
+        });
         return;
       }
       if (msg.type === 'openSettings') {
@@ -77,8 +98,10 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
   private html(webview: vscode.Webview): string {
     const nonce = getNonce();
     const media = vscode.Uri.joinPath(this.extensionUri, 'media');
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history.js'));
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history.css'));
+    // Bust any webview-side cache of the assets: a stale history.js/css can otherwise survive a
+    // window reload, serving an old build. The nonce is fresh on every html build (so every reload).
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history.js')).with({ query: `v=${nonce}` });
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history.css')).with({ query: `v=${nonce}` });
     const csp = [
       `default-src 'none'`,
       `img-src ${webview.cspSource} data:`,

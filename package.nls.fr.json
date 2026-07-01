@@ -19,6 +19,7 @@
   "config.fontSize.desc": "Taille de police, en pixels, du panneau Historique. Le texte du panneau se dimensionne a partir de cette base. `0` suit la taille de police de l'editeur.",
   "config.gitUserEmail.desc": "`user.email` Git utilise pour compter vos commits du jour. Laisser vide pour le lire depuis la configuration du depot.",
   "config.debugLogging.desc": "Ecrit un journal d'activite detaille (signaux, decisions, intervalles enregistres) dans le canal de sortie \"Time Tracking\" et dans un fichier journal du stockage de l'extension. Pour le debogage uniquement.",
+  "config.manualReasons.desc": "Raisons predefinies proposees quand vous ajoutez du temps a la main depuis le panneau Historique. « Autre » (texte libre) reste toujours disponible en plus de cette liste.",
   "capabilities.untrusted.desc": "Le suivi fonctionne dans les espaces de travail non approuves, mais le comptage des commits git est desactive tant que l'espace n'est pas approuve.",
   "capabilities.virtual.desc": "Le suivi stocke ses donnees et surveille des fichiers sur le systeme de fichiers local, il est donc limite dans les espaces de travail virtuels."
 }

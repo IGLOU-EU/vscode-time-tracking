@@ -116,6 +116,45 @@ describe('buildHistoryModel', () => {
     const model = buildHistoryModel(intervals, {}, NOW);
     expect(model.days[0].sessions).toEqual([{ start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 17) }]);
   });
+
+  it('labels a manual entry session block with its reason', () => {
+    const intervals: TaggedInterval[] = [
+      { windowId: 'w1', start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' },
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' },
+    ]);
+  });
+
+  it('keeps auto-tracked session blocks free of a reason field', () => {
+    const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 10))];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].sessions[0]).not.toHaveProperty('reason');
+  });
+
+  it('carries the reason onto the merged block when a manual entry overlaps auto time (no double count)', () => {
+    const intervals: TaggedInterval[] = [
+      tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)), // auto 2h
+      { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' }, // manual, overlaps
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].seconds).toBe(h(3) / 1000); // 09:00-12:00 union, counted once
+    expect(model.days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12), reason: 'Meeting' },
+    ]);
+  });
+
+  it('joins several distinct reasons that fall in the same block', () => {
+    const intervals: TaggedInterval[] = [
+      { windowId: 'w1', start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
+      { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 11), reason: 'Review' },
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11), reason: 'Meeting, Review' },
+    ]);
+  });
 });
 
 describe('historyWindowStartMs', () => {

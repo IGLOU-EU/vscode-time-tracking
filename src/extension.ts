@@ -15,6 +15,8 @@ import { StorageAdapter } from './adapters/storage';
 import { registerSignals } from './adapters/signals';
 import { getGitApi, CommitCounts } from './adapters/git';
 import { HistoryViewProvider, type HistoryPayload, type HistoryDataPort } from './adapters/history-view';
+import type { ManualEntryInput } from './adapters/history-view';
+import { parseYmd, parseHhMm, composeInterval, normalizeReason, truncateReason } from './core/manual-entry';
 import { createLogger } from './adapters/logger';
 
 const TICK_MS = 15_000;
@@ -32,6 +34,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const config = readConfig();
   let gitEmail = config.gitUserEmail;
   let fontSizePx = config.fontSizePx;
+  let manualReasons = config.manualReasons;
 
   const tracker: Tracker = createTracker({
     idleThresholdMs: config.idleThresholdMs,
@@ -57,8 +60,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let lastActivityTickAt = 0; // coalesces bursty activity (one keystroke fires 3 events)
   let lastTickAt = 0; // wall-clock of the last time we advanced the tracker, to spot a host suspend
 
-  // History data port: the pure model, formatted with localized labels.
-  const dataPort: HistoryDataPort = { buildPayload: () => buildPayload() };
+  // History data port: the pure model, formatted with localized labels, plus the manual-entry flow.
+  const dataPort: HistoryDataPort = {
+    buildPayload: () => buildPayload(),
+    submitManualEntry: (input) => submitManualEntry(input),
+  };
   const historyProvider = new HistoryViewProvider(context.extensionUri, dataPort);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(HistoryViewProvider.viewType, historyProvider, {
@@ -269,9 +275,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       });
       gitEmail = cfg.gitUserEmail;
       fontSizePx = cfg.fontSizePx;
+      manualReasons = cfg.manualReasons;
       logger.setEnabled(cfg.debugLogging);
       commitCounts?.clear(); // the configured email feeds the counts; git state won't signal its change
       refreshHistory();
+      void enforceManualReasonsLimit();
     }),
   );
 
@@ -294,6 +302,56 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   });
 
+  // Rewrite the manualReasons setting in place, truncating any over-long value, so the limit applies
+  // when the list is edited rather than only when a time entry is saved. The schema's maxLength only
+  // warns; this enforces it. Fixes each scope the user actually set; the rewrite re-triggers this and
+  // converges once every value already fits.
+  async function enforceManualReasonsLimit(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('timeTracking');
+    const info = cfg.inspect<string[]>('manualReasons');
+    if (!info) return;
+    const scopes: Array<[vscode.ConfigurationTarget, readonly string[] | undefined]> = [
+      [vscode.ConfigurationTarget.Global, info.globalValue],
+      [vscode.ConfigurationTarget.Workspace, info.workspaceValue],
+      [vscode.ConfigurationTarget.WorkspaceFolder, info.workspaceFolderValue],
+    ];
+    for (const [target, value] of scopes) {
+      if (!Array.isArray(value)) continue;
+      const fixed = value.map((r) => (typeof r === 'string' ? truncateReason(r) : r));
+      if (fixed.some((v, i) => v !== value[i])) {
+        await cfg.update('manualReasons', fixed, target);
+      }
+    }
+  }
+
+  // Manual entry: validate the form fields with the pure core, then store the interval like any
+  // closed session. Reusing appendInterval means the read/merge/aggregate chain counts it without
+  // double counting. Returns a localized error to show in the form, or null on success.
+  async function submitManualEntry(input: ManualEntryInput): Promise<string | null> {
+    const pid = currentProjectId;
+    if (!pid) return vscode.l10n.t('Open a project folder to add tracked time.');
+
+    const reason = normalizeReason(input.reason);
+    if (!reason) return vscode.l10n.t('Enter a reason.');
+    const ymd = parseYmd(input.date);
+    if (!ymd) return vscode.l10n.t('Enter a valid date as YYYY-MM-DD.');
+    const startMin = parseHhMm(input.start);
+    if (startMin === null) return vscode.l10n.t('Enter a valid start time as HH:MM.');
+    const endMin = parseHhMm(input.end);
+    if (endMin === null) return vscode.l10n.t('Enter a valid end time as HH:MM.');
+
+    const interval = composeInterval(ymd, startMin, endMin);
+    if (!interval) return vscode.l10n.t('The end time must be after the start time.');
+    const now = Date.now();
+    if (interval.start > now) return vscode.l10n.t('The entry cannot start in the future.');
+    if (interval.end > now) return vscode.l10n.t('The entry cannot end in the future.');
+
+    logger.log('manual', { start: interval.start, end: interval.end, reason });
+    await storage.appendInterval(pid, interval, reason);
+    refreshHistory();
+    return null;
+  }
+
   // Build the formatted payload for the webview (empty when no project is active).
   async function buildPayload(): Promise<HistoryPayload> {
     const strings = historyStrings();
@@ -304,6 +362,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         months: { currentLabel: formatClock(0), previousLabel: formatClock(0), variationText: '', variationDir: 'na' },
         days: [],
         strings,
+        manualReasons: [...manualReasons],
         todayHours: 0,
         fontSizePx,
       };
@@ -351,13 +410,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           hoursLabel: formatClock(d.seconds * 1000),
           commits: d.commits,
           // One sub-line listing each work session's time range, e.g.
-          // "Session 1: 09:00-11:00 · Session 2: 14:00-15:30".
+          // "Session 1: 09:00-11:00 · Session 2: 14:00-15:30". A manually added block shows its
+          // reason instead of "Session N".
           sessionsLabel:
             d.sessions.length > 0
-              ? d.sessions.map((r, i) => `${strings.session} ${i + 1}: ${hhmm(r.start)}-${hhmm(r.end)}`).join(' · ')
+              ? d.sessions
+                  .map((r, i) => `${r.reason ?? `${strings.session} ${i + 1}`}: ${hhmm(r.start)}-${hhmm(r.end)}`)
+                  .join(' · ')
               : undefined,
         })),
       strings,
+      manualReasons: [...manualReasons],
       todayHours: today ? today.seconds / 3600 : 0,
       fontSizePx,
     };
@@ -373,6 +436,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     refreshHistory();
   });
   refreshStatus(Date.now());
+  void enforceManualReasonsLimit(); // fix any over-long value already stored from a previous edit
 
   onDeactivate = async () => {
     watcher?.dispose();
@@ -410,7 +474,17 @@ function historyStrings(): Record<string, string> {
   return {
     history: vscode.l10n.t('History'),
     refresh: vscode.l10n.t('Refresh'),
+    addEntry: vscode.l10n.t('Add time'),
     openSettings: vscode.l10n.t('Open settings'),
+    formReason: vscode.l10n.t('Reason'),
+    formDate: vscode.l10n.t('Date'),
+    formStart: vscode.l10n.t('Start'),
+    formEnd: vscode.l10n.t('End'),
+    formOther: vscode.l10n.t('Other…'),
+    formOtherReason: vscode.l10n.t('Custom reason'),
+    formReasonRequired: vscode.l10n.t('Enter a reason.'),
+    formSave: vscode.l10n.t('Save'),
+    formCancel: vscode.l10n.t('Cancel'),
     thisMonth: vscode.l10n.t('This month'),
     lastMonth: vscode.l10n.t('Last month'),
     commitsShort: vscode.l10n.t('commits'),

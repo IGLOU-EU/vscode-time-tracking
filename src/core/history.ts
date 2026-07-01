@@ -37,7 +37,12 @@ export interface TaggedInterval {
   readonly windowId: string;
   readonly start: number;
   readonly end: number;
+  /** Reason of a manually added entry; absent for auto-tracked intervals. */
+  readonly reason?: string;
 }
+
+/** A day's work block. Carries a reason when a manual entry contributed to it. */
+export type Session = Interval & { reason?: string };
 
 /** One window's contribution to a day: its merged active ranges and total. */
 export interface WindowBreakdown {
@@ -51,7 +56,7 @@ export interface HistoryDay {
   readonly seconds: number;
   readonly commits: number;
   /** The day's contiguous work blocks (cross-window union), ordered. Each one is a session. */
-  readonly sessions: Interval[];
+  readonly sessions: Session[];
   /** Per-window detail. Length > 1 means several windows worked the project that day. */
   readonly windows: WindowBreakdown[];
 }
@@ -92,6 +97,34 @@ function breakdownByDay(tagged: readonly TaggedInterval[]): Map<string, WindowBr
     out.set(day, list);
   }
   return out;
+}
+
+// Group the reason-bearing (manual) intervals by local day, split at midnight so a cross-midnight
+// entry labels both days. Used only to attach a label to the merged session blocks; the time itself
+// is handled by the shared union, so a manual entry never double counts against auto-tracked time.
+function reasonsByDay(tagged: readonly TaggedInterval[]): Map<string, Session[]> {
+  const out = new Map<string, Session[]>();
+  for (const t of tagged) {
+    if (t.reason === undefined) continue;
+    for (const seg of splitAtMidnight({ start: t.start, end: t.end }, localMidnightOf)) {
+      const day = dayKeyLocal(seg.start);
+      const list = out.get(day) ?? [];
+      list.push({ ...seg, reason: t.reason });
+      out.set(day, list);
+    }
+  }
+  return out;
+}
+
+// Attach to each merged session block the distinct reasons of the manual entries it overlaps.
+function labelSessions(blocks: readonly Interval[], reasons: readonly Session[]): Session[] {
+  return blocks.map((block) => {
+    const names = reasons
+      .filter((r) => r.start < block.end && r.end > block.start)
+      .map((r) => r.reason as string);
+    if (names.length === 0) return block;
+    return { ...block, reason: [...new Set(names)].join(', ') };
+  });
 }
 
 /** One sample of the 24h activity curve: its instant and the activity rate (0 = idle, 1 = full). */
@@ -166,6 +199,7 @@ export function buildHistoryModel(
   const now = new Date(nowMs);
   const perDay = aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end })));
   const breakdown = breakdownByDay(tagged);
+  const reasons = reasonsByDay(tagged);
 
   const days: HistoryDay[] = perDay.map((d) => {
     const windows = breakdown.get(d.date) ?? [];
@@ -174,8 +208,9 @@ export function buildHistoryModel(
       seconds: Math.round(d.ms / 1000),
       commits: commitsByDay[d.date] ?? 0,
       // The displayed sessions are the cross-window union, so they match the day total and
-      // overlapping windows never show as two separate sessions.
-      sessions: mergeIntervals(windows.flatMap((w) => w.ranges)),
+      // overlapping windows never show as two separate sessions. A manual entry's reason labels
+      // the block it falls in.
+      sessions: labelSessions(mergeIntervals(windows.flatMap((w) => w.ranges)), reasons.get(d.date) ?? []),
       windows,
     };
   });

@@ -41,13 +41,15 @@ export class StorageAdapter {
     await vscode.workspace.fs.createDirectory(this.projectDir(projectId));
   }
 
-  async appendInterval(projectId: string, iv: Interval): Promise<void> {
+  // A reason marks a manually added entry; it is written into the same append-only day file as the
+  // auto-tracked intervals, so the whole read/merge/aggregate chain counts it exactly the same.
+  async appendInterval(projectId: string, iv: Interval, reason?: string): Promise<void> {
     if (iv.end <= iv.start) return; // nothing to store
     const file = vscode.Uri.joinPath(
       this.projectDir(projectId),
       `${dayKeyLocal(iv.start)}.${this.windowId}.jsonl`,
     );
-    await this.append(file, serializeLine(toStoredInterval(this.windowId, iv)));
+    await this.append(file, serializeLine(toStoredInterval(this.windowId, iv, reason)));
   }
 
   async writeOpenMarker(projectId: string, iv: Interval | null, now: number): Promise<void> {
@@ -118,6 +120,7 @@ export class StorageAdapter {
           windowId: r.windowId,
           start: r.start,
           end: r.end,
+          ...(r.reason !== undefined ? { reason: r.reason } : {}),
         }));
         if (settled) this.parseCache.set(key, parsed);
         out.push(...parsed);
