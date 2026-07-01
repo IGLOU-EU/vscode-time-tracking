@@ -48,8 +48,14 @@ describe('composeInterval', () => {
     });
   });
 
-  it('returns null when the end is not strictly after the start', () => {
-    expect(composeInterval(ymd, 11 * 60, 9 * 60)).toBeNull();
+  it('rolls an end at or before the start over to the next day (night session)', () => {
+    expect(composeInterval(ymd, 23 * 60, 1 * 60)).toEqual({
+      start: new Date(2026, 6, 1, 23, 0, 0, 0).getTime(),
+      end: new Date(2026, 6, 2, 1, 0, 0, 0).getTime(),
+    });
+  });
+
+  it('returns null only for a zero-length span (equal start and end)', () => {
     expect(composeInterval(ymd, 10 * 60, 10 * 60)).toBeNull();
   });
 });

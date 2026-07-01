@@ -41,7 +41,7 @@ export class StorageAdapter {
     await vscode.workspace.fs.createDirectory(this.projectDir(projectId));
   }
 
-  // A reason marks a manually added entry; it is written into the same append-only day file as the
+  // A reason marks a manually added entry. It is written into the same append-only day file as the
   // auto-tracked intervals, so the whole read/merge/aggregate chain counts it exactly the same.
   async appendInterval(projectId: string, iv: Interval, reason?: string): Promise<void> {
     if (iv.end <= iv.start) return; // nothing to store

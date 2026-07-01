@@ -319,7 +319,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Rewrite the manualReasons setting in place, truncating any over-long value, so the limit applies
   // when the list is edited rather than only when a time entry is saved. The schema's maxLength only
-  // warns; this enforces it. Fixes each scope the user actually set; the rewrite re-triggers this and
+  // warns, this enforces it. Fixes each scope the user actually set. The rewrite re-triggers this and
   // converges once every value already fits.
   async function enforceManualReasonsLimit(): Promise<void> {
     const cfg = vscode.workspace.getConfiguration('timeTracking');
@@ -356,7 +356,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (endMin === null) return vscode.l10n.t('Enter a valid end time as HH:MM.');
 
     const interval = composeInterval(ymd, startMin, endMin);
-    if (!interval) return vscode.l10n.t('The end time must be after the start time.');
+    if (!interval) return vscode.l10n.t('The start and end times must differ.');
     const now = Date.now();
     if (interval.start > now) return vscode.l10n.t('The entry cannot start in the future.');
     if (interval.end > now) return vscode.l10n.t('The entry cannot end in the future.');
@@ -367,7 +367,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return null;
   }
 
-  // Timesheet export. The whole history is read (no window bound) and reduced to the selected month;
+  // Timesheet export. The whole history is read (no window bound) and reduced to the selected month.
   // rendering is a pure core concern. The last output folder is remembered per project in
   // workspaceState (silent, not a user-facing setting).
   const LAST_FOLDER_KEY = 'export.lastFolder';

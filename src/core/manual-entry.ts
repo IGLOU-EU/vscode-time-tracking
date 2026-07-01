@@ -52,13 +52,18 @@ export function parseYmd(text: string): Ymd | null {
   return { year, month, day };
 }
 
+const DAY_MS = 86_400_000;
+
 /**
- * Build a local-time interval from a date and start/end minutes since midnight. Returns null unless
- * the end is strictly after the start (a zero or reversed span is not a session). Uses Date like
- * the rest of the local-time helpers, so the machine timezone applies.
+ * Build a local-time interval from a date and start/end minutes since midnight. An end at or before
+ * the start rolls over past midnight to the next day, so a night session (e.g. 23:00 to 01:00) is
+ * expressible from a single date. Only an equal start and end (a zero-length span) is rejected. Uses
+ * Date like the rest of the local-time helpers, so the machine timezone applies.
  */
 export function composeInterval(ymd: Ymd, startMin: number, endMin: number): Interval | null {
-  if (endMin <= startMin) return null;
+  if (endMin === startMin) return null;
   const dayStart = new Date(ymd.year, ymd.month - 1, ymd.day, 0, 0, 0, 0).getTime();
-  return { start: dayStart + startMin * 60_000, end: dayStart + endMin * 60_000 };
+  const start = dayStart + startMin * 60_000;
+  const end = dayStart + endMin * 60_000 + (endMin < startMin ? DAY_MS : 0);
+  return { start, end };
 }

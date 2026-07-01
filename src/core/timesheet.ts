@@ -1,6 +1,6 @@
 // Pure core: render a month's tracked time into CSV-like lines through a simple {token} format.
 // NO 'vscode' import. The adapter passes the day/session model (from buildDays), the user's line
-// format, a date preset and the project name; this file does the token substitution and formatting.
+// format, a date preset and the project name. This file does the token substitution and formatting.
 // Time counting is already done upstream (cross-window union), so nothing here can double count.
 
 import type { HistoryDay } from './history';
@@ -11,7 +11,7 @@ export type ExportGranularity = 'session' | 'day';
 
 /**
  * Date presets rendered in the machine's local time, following Go's standard layout constants.
- * `iso8601` is a bare date; the others are full timestamps carrying the local time and zone.
+ * `iso8601` is a bare date. The others are full timestamps carrying the local time and zone.
  */
 export type ExportDateFormat = 'iso8601' | 'rfc3339' | 'rfc1123' | 'rfc1123z' | 'rfc850';
 
@@ -152,12 +152,12 @@ export function buildTimesheetRows(
   return rows;
 }
 
-// Values a {token} can resolve to. An absent token in the format is simply not used; an unknown
+// Values a {token} can resolve to. An absent token in the format is simply not used. An unknown
 // token is left as-is so a typo stays visible rather than silently vanishing.
 function rowTokens(row: Row, project: string, dateFormat: ExportDateFormat): Record<string, string> {
   return {
     project,
-    // {date} follows the preset (a bare date for iso8601); {date_start}/{date_end} always carry the time.
+    // {date} follows the preset (a bare date for iso8601). {date_start}/{date_end} always carry the time.
     date: formatExportDate(row.startMs, dateFormat),
     date_start: formatExportDate(row.startMs, dateFormat, true),
     date_end: formatExportDate(row.endMs, dateFormat, true),
@@ -170,9 +170,20 @@ function rowTokens(row: Row, project: string, dateFormat: ExportDateFormat): Rec
   };
 }
 
-/** Substitute {token} occurrences in a line; unknown tokens are left untouched. */
+/** Substitute {token} occurrences in a line. Unknown tokens are left untouched. */
 export function renderLine(format: string, tokens: Readonly<Record<string, string>>): string {
   return format.replace(/\{(\w+)\}/g, (whole, name: string) => (name in tokens ? tokens[name] : whole));
+}
+
+/**
+ * Quote a field for a delimited file (RFC 4180): a value that contains the separator, a double
+ * quote or a newline is wrapped in double quotes with interior quotes doubled, so it survives as a
+ * single column. Plain values pass through unchanged.
+ */
+export function csvQuote(value: string, separator: string): string {
+  return value.includes(separator) || value.includes('"') || /[\n\r]/.test(value)
+    ? `"${value.replace(/"/g, '""')}"`
+    : value;
 }
 
 /**
@@ -180,18 +191,19 @@ export function renderLine(format: string, tokens: Readonly<Record<string, strin
  * file is a well-formed text file. Returns "" when there is nothing to export.
  */
 export function renderTimesheet(days: readonly HistoryDay[], opts: TimesheetOptions): string {
-  // Only split a day by reason when a column actually renders the reason; otherwise the extra rows
+  // Only split a day by reason when a column actually renders the reason. Otherwise the extra rows
   // would differ by nothing visible.
   const byReason = opts.columns.some((c) => c.template.includes('{reason}'));
   const rows = buildTimesheetRows(days, opts.granularity, opts.defaultReason, byReason);
   if (rows.length === 0) return '';
+  const sep = opts.separator;
   const lines = rows.map((r) => {
     const tokens = rowTokens(r, opts.project, opts.dateFormat);
-    return opts.columns.map((c) => renderLine(c.template, tokens)).join(opts.separator);
+    return opts.columns.map((c) => csvQuote(renderLine(c.template, tokens), sep)).join(sep);
   });
   // Header row from the column names, unless every column is unnamed.
   if (opts.columns.some((c) => c.name.length > 0)) {
-    lines.unshift(opts.columns.map((c) => c.name).join(opts.separator));
+    lines.unshift(opts.columns.map((c) => csvQuote(c.name, sep)).join(sep));
   }
   return lines.join('\n') + '\n';
 }

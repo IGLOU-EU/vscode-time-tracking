@@ -37,7 +37,7 @@ export interface TaggedInterval {
   readonly windowId: string;
   readonly start: number;
   readonly end: number;
-  /** Reason of a manually added entry; absent for auto-tracked intervals. */
+  /** Reason of a manually added entry, absent for auto-tracked intervals. */
   readonly reason?: string;
 }
 
@@ -100,7 +100,7 @@ function breakdownByDay(tagged: readonly TaggedInterval[]): Map<string, WindowBr
 }
 
 // Group the reason-bearing (manual) intervals by local day, split at midnight so a cross-midnight
-// entry labels both days. Used only to attach a label to the merged session blocks; the time itself
+// entry labels both days. Used only to attach a label to the merged session blocks. The time itself
 // is handled by the shared union, so a manual entry never double counts against auto-tracked time.
 function reasonsByDay(tagged: readonly TaggedInterval[]): Map<string, Session[]> {
   const out = new Map<string, Session[]>();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatExportDate, renderLine, buildTimesheetRows, renderTimesheet } from './timesheet';
+import { formatExportDate, renderLine, csvQuote, buildTimesheetRows, renderTimesheet } from './timesheet';
 import type { HistoryDay } from './history';
 
 const at = (y: number, mo1: number, d: number, hh = 0, mm = 0): number =>
@@ -18,7 +18,7 @@ const dayModel = (date: string, sessions: HistoryDay['sessions'], seconds: numbe
 });
 
 describe('formatExportDate', () => {
-  // The date and time parts are timezone-independent (built and read in the same local zone); only
+  // The date and time parts are timezone-independent (built and read in the same local zone). Only
   // the trailing offset/zone varies by machine, so those are matched loosely.
   it('renders a bare ISO 8601 date, or a datetime when the time is requested', () => {
     expect(formatExportDate(DAY, 'iso8601')).toBe('2026-07-01');
@@ -50,6 +50,21 @@ describe('renderLine', () => {
 
   it('ignores tokens the format does not use', () => {
     expect(renderLine('{date}', { project: 'Acme', date: '2026-07-01' })).toBe('2026-07-01');
+  });
+});
+
+describe('csvQuote', () => {
+  it('leaves a plain value untouched', () => {
+    expect(csvQuote('Development', ',')).toBe('Development');
+  });
+
+  it('wraps a value containing the separator', () => {
+    expect(csvQuote('Meeting, Review', ',')).toBe('"Meeting, Review"');
+  });
+
+  it('wraps and doubles interior quotes and newlines', () => {
+    expect(csvQuote('a"b', ',')).toBe('"a""b"');
+    expect(csvQuote('a\nb', ',')).toBe('"a\nb"');
   });
 });
 
@@ -130,7 +145,7 @@ describe('renderTimesheet', () => {
     const csv = renderTimesheet(days, BASE);
     const lines = csv.split('\n');
     expect(lines[0]).toBe('Date,Project,Task,Description,Quantity');
-    // Untagged session falls back to the default reason; the tagged one keeps its own.
+    // Untagged session falls back to the default reason, the tagged one keeps its own.
     expect(lines[1]).toBe('2026-07-01,Acme,,Development,1.50');
     expect(lines[2]).toBe('2026-07-01,Acme,,Meeting,1.00');
   });
@@ -168,6 +183,12 @@ describe('renderTimesheet', () => {
     const withoutReason = renderTimesheet(days, { ...dayOpts, columns: cols(['', '{date}'], ['', '{hours}']) });
     // No {reason} column -> one row for the whole day (2.5h).
     expect(withoutReason).toBe('2026-07-01,2.50\n');
+  });
+
+  it('quotes a cell whose value contains the separator', () => {
+    const withComma = [dayModel('20260701', [{ start: at(2026, 7, 1, 9), end: at(2026, 7, 1, 10), reason: 'Meeting, Review' }], 3600)];
+    const csv = renderTimesheet(withComma, { ...BASE, columns: cols(['', '{reason}'], ['', '{hours}']) });
+    expect(csv).toBe('"Meeting, Review",1.00\n');
   });
 
   it('returns an empty string (no header either) when there is nothing to export', () => {

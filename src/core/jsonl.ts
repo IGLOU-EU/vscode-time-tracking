@@ -79,7 +79,7 @@ export function parseIntervals(text: string): StoredInterval[] {
 }
 
 /** Stamp a raw interval with the schema version and the owning window. A non-empty reason marks a
- * manually added entry; it is omitted entirely for auto-tracked intervals so their shape is unchanged. */
+ * manually added entry, and is omitted entirely for auto-tracked intervals so their shape is unchanged. */
 export function toStoredInterval(windowId: string, iv: Interval, reason?: string): StoredInterval {
   const base = { v: SCHEMA_VERSION, windowId, start: iv.start, end: iv.end };
   return reason ? { ...base, reason } : base;
