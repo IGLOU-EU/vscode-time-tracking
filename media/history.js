@@ -93,9 +93,10 @@
       `<div class="tt-header">` +
       `<h1>${esc(s.history || 'History')}</h1>` +
       `<div class="tt-actions">` +
-      `<button id="tt-add" title="${esc(s.addEntry || 'Add time')}">+</button>` +
-      `<button id="tt-refresh" title="${esc(s.refresh || 'Refresh')}">↻</button>` +
-      `<button id="tt-settings" title="${esc(s.openSettings || 'Open settings')}">⚙</button>` +
+      `<button id="tt-add" title="${esc(s.addEntry || 'Add time')}"><i class="codicon codicon-add"></i></button>` +
+      `<button id="tt-export" title="${esc(s.exportTitle || 'Export timesheet')}"><i class="codicon codicon-export"></i></button>` +
+      `<button id="tt-refresh" title="${esc(s.refresh || 'Refresh')}"><i class="codicon codicon-refresh"></i></button>` +
+      `<button id="tt-settings" title="${esc(s.openSettings || 'Open settings')}"><i class="codicon codicon-settings-gear"></i></button>` +
       `</div>` +
       `</div>` +
       badges +
@@ -107,6 +108,8 @@
     if (refresh) refresh.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
     const add = document.getElementById('tt-add');
     if (add) add.addEventListener('click', openAddForm);
+    const exportBtn = document.getElementById('tt-export');
+    if (exportBtn) exportBtn.addEventListener('click', () => vscode.postMessage({ type: 'openExport' }));
     const settings = document.getElementById('tt-settings');
     if (settings) settings.addEventListener('click', () => vscode.postMessage({ type: 'openSettings' }));
     // Click a day with several sessions to expand its full breakdown (toggle the ellipsis off).
@@ -224,12 +227,109 @@
     }
   }
 
+  // Export modal: month + granularity + output path, all editable at once. Shares the modal id and
+  // styles with the add form (only one modal is ever open).
+  function openExportForm(open) {
+    closeAddForm();
+    const s = lastStrings;
+    const months = Array.isArray(open.months) ? open.months : [];
+    const overlay = document.createElement('div');
+    overlay.id = 'tt-modal';
+    overlay.className = 'tt-modal-backdrop';
+
+    if (months.length === 0) {
+      overlay.innerHTML =
+        `<div class="tt-modal">` +
+        `<h2>${esc(s.exportTitle || 'Export timesheet')}</h2>` +
+        `<p class="tt-modal-error">${esc(s.exportEmpty || 'No data to export yet.')}</p>` +
+        `<div class="tt-modal-actions"><button type="button" id="tt-x-cancel">${esc(s.formCancel || 'Cancel')}</button></div>` +
+        `</div>`;
+      document.body.appendChild(overlay);
+      wireModalDismiss(overlay);
+      return;
+    }
+
+    const monthOptions = months
+      .map((m) => `<option value="${esc(m.value)}"${m.value === open.defaultMonth ? ' selected' : ''}>${esc(m.label)}</option>`)
+      .join('');
+    overlay.innerHTML =
+      `<form class="tt-modal" id="tt-x-form">` +
+      `<h2>${esc(s.exportTitle || 'Export timesheet')}</h2>` +
+      `<label>${esc(s.exportMonth || 'Month')}<select id="tt-x-month">${monthOptions}</select></label>` +
+      `<label>${esc(s.exportGranularity || 'Rows')}<select id="tt-x-gran">` +
+      `<option value="day">${esc(s.exportPerDay || 'Per day')}</option>` +
+      `<option value="session">${esc(s.exportPerSession || 'Per session')}</option>` +
+      `</select></label>` +
+      `<label>${esc(s.exportFile || 'File')}` +
+      `<span class="tt-modal-file"><input type="text" id="tt-x-path" value="${esc(open.defaultPath || '')}" />` +
+      `<button type="button" id="tt-x-browse">${esc(s.exportBrowse || 'Choose…')}</button></span></label>` +
+      `<p class="tt-modal-error tt-hidden" id="tt-x-error"></p>` +
+      `<div class="tt-modal-actions">` +
+      `<button type="button" id="tt-x-cancel">${esc(s.formCancel || 'Cancel')}</button>` +
+      `<button type="submit" id="tt-x-run">${esc(s.exportRun || 'Export')}</button>` +
+      `</div>` +
+      `</form>`;
+    document.body.appendChild(overlay);
+    wireModalDismiss(overlay);
+
+    const browse = document.getElementById('tt-x-browse');
+    const pathInput = /** @type {HTMLInputElement} */ (document.getElementById('tt-x-path'));
+    if (browse) browse.addEventListener('click', () => vscode.postMessage({ type: 'exportBrowse', path: pathInput ? pathInput.value : '' }));
+
+    const form = document.getElementById('tt-x-form');
+    if (form)
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitExportForm();
+      });
+  }
+
+  // Cancel button, backdrop click and Escape all dismiss the modal.
+  function wireModalDismiss(overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeAddForm();
+    });
+    const cancel = document.getElementById('tt-x-cancel');
+    if (cancel) cancel.addEventListener('click', closeAddForm);
+    document.addEventListener('keydown', onModalKey);
+  }
+
+  function submitExportForm() {
+    const month = /** @type {HTMLSelectElement} */ (document.getElementById('tt-x-month'));
+    const gran = /** @type {HTMLSelectElement} */ (document.getElementById('tt-x-gran'));
+    const pathInput = /** @type {HTMLInputElement} */ (document.getElementById('tt-x-path'));
+    if (!month || !gran || !pathInput || !pathInput.value.trim()) {
+      showExportError(lastStrings.exportFile || 'File');
+      return;
+    }
+    const run = /** @type {HTMLButtonElement} */ (document.getElementById('tt-x-run'));
+    if (run) run.disabled = true;
+    vscode.postMessage({ type: 'exportRun', month: month.value, granularity: gran.value, path: pathInput.value.trim() });
+  }
+
+  /** @param {string} [message] */
+  function showExportError(message) {
+    const run = /** @type {HTMLButtonElement} */ (document.getElementById('tt-x-run'));
+    if (run) run.disabled = false;
+    const err = document.getElementById('tt-x-error');
+    if (err) {
+      err.textContent = message || '';
+      err.classList.toggle('tt-hidden', !message);
+    }
+  }
+
   window.addEventListener('message', (event) => {
     const message = event.data;
     if (!message) return;
     if (message.type === 'history') render(message.payload);
     else if (message.type === 'entryError') showFormError(message.message);
     else if (message.type === 'entrySaved') closeAddForm();
+    else if (message.type === 'exportOpen') openExportForm(message);
+    else if (message.type === 'exportPath') {
+      const pathInput = /** @type {HTMLInputElement} */ (document.getElementById('tt-x-path'));
+      if (pathInput) pathInput.value = message.path;
+    } else if (message.type === 'exportError') showExportError(message.message);
+    else if (message.type === 'exportDone') closeAddForm();
   });
 
   // Tell the extension host the webview is ready to receive data.

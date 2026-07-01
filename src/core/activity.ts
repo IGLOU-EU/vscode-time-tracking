@@ -21,3 +21,17 @@ export function formatClock(ms: number): string {
   if (hours === 0) return `${minutes}m`;
   return `${hours}h ${String(minutes).padStart(2, '0')}m`;
 }
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+/** A duration as "H:MM" (e.g. "1:30", "0:45"), for a timesheet total column. */
+export function durationHm(ms: number): string {
+  const { hours, minutes } = hoursMinutes(ms);
+  return `${hours}:${pad2(minutes)}`;
+}
+
+/** Local wall-clock time of an instant as "HH:MM" (machine timezone). */
+export function clockTime(ms: number): string {
+  const d = new Date(ms);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}

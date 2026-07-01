@@ -2,6 +2,7 @@
 // the extension host computes everything (SVG, labels) and sends it via postMessage. Without
 // retainContextWhenHidden, we only post to a visible view and re-push on visibility/refresh.
 import * as vscode from 'vscode';
+import type { ExportGranularity } from '../core/timesheet';
 
 export interface HistoryPayload {
   trendSvg: string;
@@ -33,15 +34,43 @@ export interface ManualEntryInput {
   end: string;
 }
 
+/** A selectable month in the export modal. */
+export interface ExportMonth {
+  value: string; // YYYYMM
+  label: string; // localized, e.g. "July 2026"
+}
+
+/** What the export modal needs when it opens: the available months and a proposed file path. */
+export interface ExportOpen {
+  months: ExportMonth[];
+  defaultMonth: string | null; // preselected value, null when no data
+  defaultPath: string;
+}
+
+/** The chosen export parameters submitted from the modal. */
+export interface ExportRequest {
+  month: string;
+  granularity: ExportGranularity;
+  path: string;
+}
+
 export interface HistoryDataPort {
   buildPayload(): Promise<HistoryPayload>;
   /** Validate and store a manual entry. Returns a localized error message, or null on success. */
   submitManualEntry(input: ManualEntryInput): Promise<string | null>;
+  /** Gather the months with data and a default output path for the export modal. */
+  getExportOpen(): Promise<ExportOpen>;
+  /** Native save dialog seeded with `suggestedPath`. Returns the chosen path, or null if cancelled. */
+  browseExportPath(suggestedPath: string): Promise<string | null>;
+  /** Write the timesheet. Returns a localized error message, or null on success. */
+  runExport(request: ExportRequest): Promise<string | null>;
 }
 
 type InboundMessage =
-  | { type: 'ready' | 'refresh' | 'openSettings' }
-  | ({ type: 'submitEntry' } & ManualEntryInput);
+  | { type: 'ready' | 'refresh' | 'openSettings' | 'openExport' }
+  | ({ type: 'submitEntry' } & ManualEntryInput)
+  | { type: 'exportBrowse'; path: string }
+  | ({ type: 'exportRun' } & ExportRequest);
 
 export class HistoryViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'timeTracking.historyView'; // must match contributes.views id
@@ -74,6 +103,25 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
       }
       if (msg.type === 'openSettings') {
         void vscode.commands.executeCommand('workbench.action.openSettings', 'timeTracking');
+        return;
+      }
+      if (msg.type === 'openExport') {
+        void this.data.getExportOpen().then((open) => {
+          void this.view?.webview.postMessage({ type: 'exportOpen', ...open });
+        });
+        return;
+      }
+      if (msg.type === 'exportBrowse') {
+        void this.data.browseExportPath(msg.path).then((path) => {
+          if (path !== null) void this.view?.webview.postMessage({ type: 'exportPath', path });
+        });
+        return;
+      }
+      if (msg.type === 'exportRun') {
+        const { month, granularity, path } = msg;
+        void this.data.runExport({ month, granularity, path }).then((error) => {
+          void this.view?.webview.postMessage({ type: error ? 'exportError' : 'exportDone', message: error });
+        });
       }
     });
     view.onDidChangeVisibility(() => {
@@ -102,6 +150,8 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
     // window reload, serving an old build. The nonce is fresh on every html build (so every reload).
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history.js')).with({ query: `v=${nonce}` });
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history.css')).with({ query: `v=${nonce}` });
+    // Codicon font (vendored from @vscode/codicons) for the native toolbar icons.
+    const codiconUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'codicon.css'));
     const csp = [
       `default-src 'none'`,
       `img-src ${webview.cspSource} data:`,
@@ -115,6 +165,7 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="${codiconUri}" rel="stylesheet" />
   <link href="${styleUri}" rel="stylesheet" />
   <title>${vscode.l10n.t('History')}</title>
 </head>

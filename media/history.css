@@ -57,6 +57,11 @@ body {
   background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
 }
 
+/* Codicon glyphs scale with the panel font instead of the codicon.css fixed 16px, for accessibility. */
+.tt-actions .codicon {
+  font-size: 1.15em;
+}
+
 /* Sections */
 .tt-section {
   margin-top: 20px;
@@ -389,21 +394,52 @@ body {
   cursor: pointer;
 }
 
-#tt-f-save {
+#tt-f-save,
+#tt-x-run {
   color: var(--vscode-button-foreground);
   background: var(--vscode-button-background);
 }
 
-#tt-f-save:hover {
+#tt-f-save:hover,
+#tt-x-run:hover {
   background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
 }
 
-#tt-f-cancel {
+#tt-f-cancel,
+#tt-x-cancel {
   color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
   background: var(--vscode-button-secondaryBackground, transparent);
   border: 1px solid var(--vscode-widget-border, transparent);
 }
 
-#tt-f-cancel:hover {
+#tt-f-cancel:hover,
+#tt-x-cancel:hover {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2)));
+}
+
+/* File row of the export modal: path input plus a "Choose…" button. */
+.tt-modal-file {
+  display: flex;
+  gap: 6px;
+}
+
+.tt-modal-file input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tt-modal-file button {
+  padding: 4px 10px;
+  white-space: nowrap;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  background: var(--vscode-button-secondaryBackground, transparent);
+  border: 1px solid var(--vscode-widget-border, transparent);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+.tt-modal-file button:hover {
   background: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2)));
 }

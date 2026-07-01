@@ -191,17 +191,20 @@ function heatmapSeries(
  * ranges. `commitsByDay` maps YYYYMMDD to a commit count. `nowMs` anchors the chart windows and
  * the current month for the badges.
  */
-export function buildHistoryModel(
+/**
+ * Per-day view models (totals, per-window breakdown, reason-labeled sessions) over the whole set of
+ * tagged intervals, ordered by day. No charts, so the timesheet export can reuse it over the full
+ * history without paying for SVG rendering. `commitsByDay` may be empty when commits are irrelevant.
+ */
+export function buildDays(
   tagged: readonly TaggedInterval[],
   commitsByDay: Readonly<Record<string, number>>,
-  nowMs: number,
-): HistoryModel {
-  const now = new Date(nowMs);
+): HistoryDay[] {
   const perDay = aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end })));
   const breakdown = breakdownByDay(tagged);
   const reasons = reasonsByDay(tagged);
 
-  const days: HistoryDay[] = perDay.map((d) => {
+  return perDay.map((d) => {
     const windows = breakdown.get(d.date) ?? [];
     return {
       date: d.date,
@@ -214,7 +217,15 @@ export function buildHistoryModel(
       windows,
     };
   });
+}
 
+export function buildHistoryModel(
+  tagged: readonly TaggedInterval[],
+  commitsByDay: Readonly<Record<string, number>>,
+  nowMs: number,
+): HistoryModel {
+  const now = new Date(nowMs);
+  const days = buildDays(tagged, commitsByDay);
   const byDay = new Map<string, number>(days.map((d) => [d.date, d.seconds]));
 
   // 24h activity-density curve. Many close samples make it genuinely smooth; the value plotted is
@@ -233,6 +244,10 @@ export function buildHistoryModel(
     days,
     trendSvg,
     heatmapSvg: renderCalendarHeatmap(heatmapSeries(byDay, commitsByDay, nowMs, HEATMAP_WEEKS)),
-    months: buildMonthlyBadges(perDay, now.getFullYear(), now.getMonth()),
+    months: buildMonthlyBadges(
+      aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end }))),
+      now.getFullYear(),
+      now.getMonth(),
+    ),
   };
 }

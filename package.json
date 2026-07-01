@@ -175,15 +175,73 @@
             "maxLength": 32
           },
           "default": [
+            "Development",
             "Meeting",
             "Code review",
             "Planning",
-            "Documentation",
-            "Support"
+            "Documentation"
           ],
           "scope": "machine-overridable",
           "order": 8,
           "markdownDescription": "%config.manualReasons.desc%"
+        },
+        "timeTracking.projectName": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "order": 9,
+          "markdownDescription": "%config.projectName.desc%"
+        },
+        "timeTracking.defaultReason": {
+          "type": "string",
+          "default": "Development",
+          "scope": "machine-overridable",
+          "order": 10,
+          "markdownDescription": "%config.defaultReason.desc%"
+        },
+        "timeTracking.exportColumns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Date={date}",
+            "Project={project}",
+            "Task=",
+            "Description={reason}",
+            "Quantity={hours}"
+          ],
+          "scope": "machine-overridable",
+          "order": 11,
+          "markdownDescription": "%config.exportColumns.desc%"
+        },
+        "timeTracking.exportSeparator": {
+          "type": "string",
+          "default": ",",
+          "scope": "machine-overridable",
+          "order": 12,
+          "markdownDescription": "%config.exportSeparator.desc%"
+        },
+        "timeTracking.exportDateFormat": {
+          "type": "string",
+          "enum": [
+            "iso8601",
+            "rfc3339",
+            "rfc1123",
+            "rfc1123z",
+            "rfc850"
+          ],
+          "enumDescriptions": [
+            "Bare date, e.g. 2026-07-01",
+            "RFC 3339, e.g. 2026-07-01T09:05:00+02:00",
+            "RFC 1123, e.g. Wed, 01 Jul 2026 09:05:00 CEST",
+            "RFC 1123 with numeric zone, e.g. Wed, 01 Jul 2026 09:05:00 +0200",
+            "RFC 850, e.g. Wednesday, 01-Jul-26 09:05:00 CEST"
+          ],
+          "default": "iso8601",
+          "scope": "machine-overridable",
+          "order": 13,
+          "markdownDescription": "%config.exportDateFormat.desc%"
         }
       }
     }

@@ -1,6 +1,7 @@
 // Adapter: reads the timeTracking settings and converts them into core units (ms).
 import * as vscode from 'vscode';
-import { truncateReason } from '../core/manual-entry';
+import { truncateReason, normalizeReason } from '../core/manual-entry';
+import type { ExportDateFormat, ExportColumn } from '../core/timesheet';
 
 export interface TimeTrackingConfig {
   readonly idleThresholdMs: number;
@@ -12,11 +13,30 @@ export interface TimeTrackingConfig {
   readonly gitUserEmail: string;
   readonly debugLogging: boolean;
   readonly manualReasons: readonly string[]; // preset reasons offered when adding time by hand
+  readonly projectName: string; // display name for the {project} export token; empty = folder name
+  readonly exportColumns: readonly ExportColumn[]; // "Name={template}" mapping, drives header + cells
+  readonly exportSeparator: string; // joins the export columns
+  readonly exportDateFormat: ExportDateFormat; // date preset used by the {date} token
+  readonly defaultReason: string; // {reason} for untagged (plain editor) time
+}
+
+// Default columns of the exported CSV timesheet.
+const DEFAULT_EXPORT_COLUMNS = ['Date={date}', 'Project={project}', 'Task=', 'Description={reason}', 'Quantity={hours}'];
+const DATE_FORMATS: readonly ExportDateFormat[] = ['iso8601', 'rfc3339', 'rfc1123', 'rfc1123z', 'rfc850'];
+
+// Each entry is "Name=template"; the first '=' splits them, so a template may itself contain '='.
+function parseColumns(entries: readonly string[]): ExportColumn[] {
+  return entries.map((e) => {
+    const i = e.indexOf('=');
+    return i < 0 ? { name: e, template: '' } : { name: e.slice(0, i), template: e.slice(i + 1) };
+  });
 }
 
 // Sensible defaults for a manual entry's reason. Editable in settings; "Other" (free text) is always
 // offered on top of these by the entry flow.
-const DEFAULT_MANUAL_REASONS = ['Meeting', 'Code review', 'Planning', 'Documentation', 'Support'];
+// Development leads (the common reason for time spent working in the editor) and is the preselected
+// entry; the rest cover the usual non-coding activities.
+const DEFAULT_MANUAL_REASONS = ['Development', 'Meeting', 'Code review', 'Planning', 'Documentation'];
 
 export function readConfig(): TimeTrackingConfig {
   const c = vscode.workspace.getConfiguration('timeTracking');
@@ -38,7 +58,16 @@ export function readConfig(): TimeTrackingConfig {
     // before the stored setting is rewritten. Capitalization is applied later, when a time entry is
     // saved, not to the user's setting value.
     manualReasons: c.get<string[]>('manualReasons', DEFAULT_MANUAL_REASONS).map(truncateReason).filter(Boolean),
+    projectName: c.get<string>('projectName', '').trim(),
+    exportColumns: parseColumns(c.get<string[]>('exportColumns', DEFAULT_EXPORT_COLUMNS)),
+    exportSeparator: c.get<string>('exportSeparator', ','),
+    exportDateFormat: readDateFormat(c.get<string>('exportDateFormat', 'iso8601')),
+    defaultReason: normalizeReason(c.get<string>('defaultReason', 'Development')),
   };
+}
+
+function readDateFormat(value: string): ExportDateFormat {
+  return (DATE_FORMATS as readonly string[]).includes(value) ? (value as ExportDateFormat) : 'iso8601';
 }
 
 export function onConfigChange(callback: (config: TimeTrackingConfig) => void): vscode.Disposable {

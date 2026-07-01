@@ -20,6 +20,11 @@
   "config.gitUserEmail.desc": "`user.email` Git utilise pour compter vos commits du jour. Laisser vide pour le lire depuis la configuration du depot.",
   "config.debugLogging.desc": "Ecrit un journal d'activite detaille (signaux, decisions, intervalles enregistres) dans le canal de sortie \"Time Tracking\" et dans un fichier journal du stockage de l'extension. Pour le debogage uniquement.",
   "config.manualReasons.desc": "Raisons predefinies proposees quand vous ajoutez du temps a la main depuis le panneau Historique. « Autre » (texte libre) reste toujours disponible en plus de cette liste.",
+  "config.projectName.desc": "Nom utilise pour le jeton `{project}` lors de l'export d'une fiche de temps. Laisser vide pour utiliser le nom du dossier de l'espace de travail.",
+  "config.defaultReason.desc": "Raison utilisee pour le temps sans raison explicite (suivi classique dans l'editeur). Remplit le jeton d'export `{reason}` pour les sessions auto-suivies.",
+  "config.exportColumns.desc": "Colonnes de la fiche exportee, chacune sous la forme `Nom={modele}`. Les noms forment la ligne d'en-tete ; les modeles remplissent chaque cellule. Jetons : `{project}`, `{date}` (selon le format de date), `{date_start}`, `{date_end}` (date-heure de debut/fin, toujours avec l'heure), `{start}`, `{end}` (HH:MM), `{total}` (H:MM), `{hours}` (decimal), `{minutes}`, `{reason}`. Une colonne au modele vide donne une cellule vide ; des colonnes sans nom suppriment l'en-tete.",
+  "config.exportSeparator.desc": "Caractere qui joint les colonnes de l'export (et l'en-tete). Defaut `,` pour du CSV.",
+  "config.exportDateFormat.desc": "Format du jeton `{date}` dans la fiche exportee, rendu selon l'heure locale de la machine. `iso8601` est une date simple ; les presets avec fuseau (RFC 3339, RFC 1123, RFC 1123 numerique, RFC 850) incluent l'heure de debut de la ligne et le fuseau horaire.",
   "capabilities.untrusted.desc": "Le suivi fonctionne dans les espaces de travail non approuves, mais le comptage des commits git est desactive tant que l'espace n'est pas approuve.",
   "capabilities.virtual.desc": "Le suivi stocke ses donnees et surveille des fichiers sur le systeme de fichiers local, il est donc limite dans les espaces de travail virtuels."
 }
