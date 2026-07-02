@@ -47,8 +47,9 @@ export function readConfig(): TimeTrackingConfig {
     gitUserEmail: c.get<string>('gitUserEmail', '').trim(),
     debugLogging: c.get<boolean>('debugLogging', false),
     // Defaults come from the package.json contribution (single source of truth). Truncate each preset
-    // as it is ingested, so the shown list is never over-long even before the stored setting is
-    // rewritten. Capitalization is applied later, when a time entry is saved, not to the setting.
+    // as it is ingested: the stored setting is never rewritten (the schema's maxLength only warns),
+    // this read is what enforces the cap. Capitalization is applied later, when a time entry is
+    // saved, not to the setting.
     manualReasons: c.get<string[]>('manualReasons', []).map(truncateReason).filter(Boolean),
     projectName: c.get<string>('projectName', '').trim(),
     exportColumns: parseColumns(c.get<string[]>('exportColumns', [])),

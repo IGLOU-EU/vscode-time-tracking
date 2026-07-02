@@ -18,7 +18,7 @@ import { registerSignals } from './adapters/signals';
 import { getGitApi, CommitCounts } from './adapters/git';
 import { HistoryViewProvider, type HistoryPayload, type HistoryDataPort } from './adapters/history-view';
 import type { ManualEntryInput, ExportOpen, ExportRequest } from './adapters/history-view';
-import { parseYmd, parseHhMm, composeInterval, normalizeReason, truncateReason } from './core/manual-entry';
+import { parseYmd, parseHhMm, composeInterval, normalizeReason } from './core/manual-entry';
 import { createLogger } from './adapters/logger';
 
 const TICK_MS = 15_000;
@@ -294,7 +294,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       logger.setEnabled(cfg.debugLogging);
       commitCounts?.clear(); // the configured email feeds the counts; git state won't signal its change
       refreshHistory();
-      void enforceManualReasonsLimit();
     }),
   );
 
@@ -316,28 +315,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       clearInterval(checkpointTimer);
     },
   });
-
-  // Rewrite the manualReasons setting in place, truncating any over-long value, so the limit applies
-  // when the list is edited rather than only when a time entry is saved. The schema's maxLength only
-  // warns, this enforces it. Fixes each scope the user actually set. The rewrite re-triggers this and
-  // converges once every value already fits.
-  async function enforceManualReasonsLimit(): Promise<void> {
-    const cfg = vscode.workspace.getConfiguration('timeTracking');
-    const info = cfg.inspect<string[]>('manualReasons');
-    if (!info) return;
-    const scopes: Array<[vscode.ConfigurationTarget, readonly string[] | undefined]> = [
-      [vscode.ConfigurationTarget.Global, info.globalValue],
-      [vscode.ConfigurationTarget.Workspace, info.workspaceValue],
-      [vscode.ConfigurationTarget.WorkspaceFolder, info.workspaceFolderValue],
-    ];
-    for (const [target, value] of scopes) {
-      if (!Array.isArray(value)) continue;
-      const fixed = value.map((r) => (typeof r === 'string' ? truncateReason(r) : r));
-      if (fixed.some((v, i) => v !== value[i])) {
-        await cfg.update('manualReasons', fixed, target);
-      }
-    }
-  }
 
   // Manual entry: validate the form fields with the pure core, then store the interval like any
   // closed session. Reusing appendInterval means the read/merge/aggregate chain counts it without
@@ -527,7 +504,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     refreshHistory();
   });
   refreshStatus(Date.now());
-  void enforceManualReasonsLimit(); // fix any over-long value already stored from a previous edit
 
   onDeactivate = async () => {
     watcher?.dispose();
