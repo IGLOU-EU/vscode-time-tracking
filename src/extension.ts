@@ -552,6 +552,7 @@ function historyStrings(): Record<string, string> {
     exportPerSession: vscode.l10n.t('Per session'),
     exportPerDay: vscode.l10n.t('Per day'),
     exportFile: vscode.l10n.t('File'),
+    exportPathRequired: vscode.l10n.t('Enter a file path.'),
     exportBrowse: vscode.l10n.t('Choose…'),
     exportRun: vscode.l10n.t('Export'),
     exportEmpty: vscode.l10n.t('No data to export yet.'),

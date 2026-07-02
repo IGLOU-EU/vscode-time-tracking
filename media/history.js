@@ -306,7 +306,7 @@
     const gran = /** @type {HTMLSelectElement} */ (document.getElementById('tt-x-gran'));
     const pathInput = /** @type {HTMLInputElement} */ (document.getElementById('tt-x-path'));
     if (!month || !gran || !pathInput || !pathInput.value.trim()) {
-      showExportError(lastStrings.exportFile || 'File');
+      showExportError(lastStrings.exportPathRequired || 'Enter a file path.');
       return;
     }
     const run = /** @type {HTMLButtonElement} */ (document.getElementById('tt-x-run'));
