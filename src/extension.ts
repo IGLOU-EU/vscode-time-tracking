@@ -397,7 +397,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   async function runExport(request: ExportRequest): Promise<string | null> {
     if (!currentProjectId) return vscode.l10n.t('Open a project folder to export.');
-    const days = (await allExportDays()).filter((d) => d.date.slice(0, 6) === request.month);
+    // Bound the read to the exported month instead of re-reading the whole history (the modal
+    // already paid that full read for the month list). The one-day slack of readAllTagged brings
+    // in a session started on the eve, and the day filter then keeps exactly the month.
+    const monthStart = new Date(Number(request.month.slice(0, 4)), Number(request.month.slice(4, 6)) - 1, 1).getTime();
+    const tagged = await storage.readAllTagged(currentProjectId, { sinceMs: monthStart, includeOpen: false });
+    const days = buildDays(tagged, {}).filter((d) => d.date.slice(0, 6) === request.month);
     const project = projectName || (currentFolder ? path.basename(currentFolder.fsPath) : 'project');
     const csv = renderTimesheet(days, {
       granularity: request.granularity,
