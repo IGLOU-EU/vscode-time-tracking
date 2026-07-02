@@ -95,10 +95,17 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
       }
       if (msg.type === 'submitEntry') {
         const { reason, date, start, end } = msg;
-        void this.data.submitManualEntry({ reason, date, start, end }).then((error) => {
-          // Tell the form to show the error and stay open, or to close on success.
-          void this.view?.webview.postMessage({ type: error ? 'entryError' : 'entrySaved', message: error });
-        });
+        void this.data
+          .submitManualEntry({ reason, date, start, end })
+          .then((error) => {
+            // Tell the form to show the error and stay open, or to close on success.
+            void this.view?.webview.postMessage({ type: error ? 'entryError' : 'entrySaved', message: error });
+          })
+          .catch((e: unknown) => {
+            // A rejected save (disk full, read-only storage) must not leave the button disabled.
+            const message = vscode.l10n.t('Saving failed: {error}', { error: errorText(e) });
+            void this.view?.webview.postMessage({ type: 'entryError', message });
+          });
         return;
       }
       if (msg.type === 'openSettings') {
@@ -106,22 +113,40 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       if (msg.type === 'openExport') {
-        void this.data.getExportOpen().then((open) => {
-          void this.view?.webview.postMessage({ type: 'exportOpen', ...open });
-        });
+        void this.data
+          .getExportOpen()
+          .then((open) => {
+            void this.view?.webview.postMessage({ type: 'exportOpen', ...open });
+          })
+          .catch((e: unknown) => {
+            // The modal only opens on the reply, so a silent rejection would make the click do nothing.
+            void vscode.window.showErrorMessage(vscode.l10n.t('Could not open the export form: {error}', { error: errorText(e) }));
+          });
         return;
       }
       if (msg.type === 'exportBrowse') {
-        void this.data.browseExportPath(msg.path).then((path) => {
-          if (path !== null) void this.view?.webview.postMessage({ type: 'exportPath', path });
-        });
+        void this.data
+          .browseExportPath(msg.path)
+          .then((path) => {
+            if (path !== null) void this.view?.webview.postMessage({ type: 'exportPath', path });
+          })
+          .catch((e: unknown) => {
+            void vscode.window.showErrorMessage(vscode.l10n.t('Could not open the save dialog: {error}', { error: errorText(e) }));
+          });
         return;
       }
       if (msg.type === 'exportRun') {
         const { month, granularity, path } = msg;
-        void this.data.runExport({ month, granularity, path }).then((error) => {
-          void this.view?.webview.postMessage({ type: error ? 'exportError' : 'exportDone', message: error });
-        });
+        void this.data
+          .runExport({ month, granularity, path })
+          .then((error) => {
+            void this.view?.webview.postMessage({ type: error ? 'exportError' : 'exportDone', message: error });
+          })
+          .catch((e: unknown) => {
+            // Same contract as a returned error: show it in the form and unlock the Export button.
+            const message = vscode.l10n.t('Export failed: {error}', { error: errorText(e) });
+            void this.view?.webview.postMessage({ type: 'exportError', message });
+          });
       }
     });
     view.onDidChangeVisibility(() => {
@@ -175,6 +200,11 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
 </body>
 </html>`;
   }
+}
+
+// Human-readable text of a rejection value, for the localized error messages above.
+function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
 }
 
 function getNonce(): string {
