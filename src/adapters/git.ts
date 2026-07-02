@@ -21,10 +21,19 @@ export async function getGitApi(): Promise<GitAPI | undefined> {
   return api;
 }
 
+// The API's getConfig reads the repository-local scope only, while most setups define user.email
+// globally, so the global scope is the fallback. Each read failure falls through: the git
+// extension resolves reads to '' or rejects while it is still settling at startup.
 async function resolveEmail(repo: Repository, override: string): Promise<string> {
   if (override.length > 0) return override;
   try {
-    return (await repo.getConfig('user.email')) ?? '';
+    const local = await repo.getConfig('user.email');
+    if (local) return local;
+  } catch {
+    // fall through to the global scope
+  }
+  try {
+    return (await repo.getGlobalConfig('user.email')) ?? '';
   } catch {
     return '';
   }
@@ -42,7 +51,8 @@ function toRecords(commits: readonly Commit[]): CommitRecord[] {
 /**
  * Per-day commit counts (mine, non-merge) for a folder, restricted to commits authored on or after
  * `sinceMs` (the history window: older commits are never displayed, so they are not counted).
- * Returns {} when git is unavailable.
+ * Returns null when the count could not be established (no repository, no resolvable email, or a
+ * failed git log), so the caller can tell a transient failure from an authoritative zero.
  */
 export async function myCommitCountsByDay(
   api: GitAPI,
@@ -50,17 +60,17 @@ export async function myCommitCountsByDay(
   emailOverride: string,
   sinceMs = 0,
   maxEntries = 500,
-): Promise<Record<string, number>> {
+): Promise<Record<string, number> | null> {
   const repo = api.getRepository(folder);
-  if (!repo) return {};
+  if (!repo) return null;
   const email = (await resolveEmail(repo, emailOverride)).trim().toLowerCase();
-  if (email.length === 0) return {};
+  if (email.length === 0) return null;
 
   let commits: Commit[];
   try {
     commits = await repo.log({ maxEntries });
   } catch {
-    return {};
+    return null;
   }
   return countMyCommitsByDay(toRecords(commits), { myEmail: email, sinceMs });
 }
@@ -70,7 +80,8 @@ export async function myCommitCountsByDay(
  * refresh (the panel rebuilds ~once a minute while open). The cache is dropped when the repository
  * state changes (a new commit, amend, rebase, or checkout), the git-side analogue of the file
  * watcher evicting a changed JSONL file. clear() handles a settings change (e.g. the configured
- * email) that the git state event would not signal.
+ * email) that the git state event would not signal. A failed count (null) is never cached: a
+ * transient startup failure would otherwise freeze "zero commits" until the next git operation.
  */
 export class CommitCounts implements vscode.Disposable {
   private readonly cache = new Map<string, Record<string, number>>();
@@ -88,6 +99,7 @@ export class CommitCounts implements vscode.Disposable {
     const hit = this.cache.get(key);
     if (hit) return hit;
     const counts = await myCommitCountsByDay(this.api, folder, emailOverride, sinceMs);
+    if (counts === null) return {}; // transient failure: retry on the next refresh instead of caching
     this.cache.set(key, counts);
     return counts;
   }

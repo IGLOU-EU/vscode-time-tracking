@@ -40,5 +40,8 @@ export interface Repository {
   readonly rootUri: Uri;
   readonly state: RepositoryState;
   log(options?: LogOptions): Promise<Commit[]>;
+  /** Reads the repository-local config scope only (`git config --get --local`). */
   getConfig(key: string): Promise<string>;
+  /** Reads the global config scope (`git config --global --get`). */
+  getGlobalConfig(key: string): Promise<string>;
 }
