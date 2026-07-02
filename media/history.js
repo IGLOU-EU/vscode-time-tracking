@@ -12,9 +12,16 @@
   let lastStrings = /** @type {Record<string, string>} */ ({});
   let lastReasons = /** @type {string[]} */ ([]);
 
+  // Quotes included: esc() also feeds double-quoted attribute values (option/input `value="..."`),
+  // where an unescaped quote would truncate the value and inject stray attributes.
   /** @param {unknown} s @returns {string} */
   function esc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function legendSvg() {
