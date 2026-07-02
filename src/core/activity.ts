@@ -22,7 +22,8 @@ export function formatClock(ms: number): string {
   return `${hours}h ${String(minutes).padStart(2, '0')}m`;
 }
 
-const pad2 = (n: number): string => String(n).padStart(2, '0');
+/** Two-digit zero-padded number, the building block of every clock/date rendering in the core. */
+export const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 /** A duration as "H:MM" (e.g. "1:30", "0:45"), for a timesheet total column. */
 export function durationHm(ms: number): string {

@@ -9,7 +9,7 @@ import { buildHistoryModel, buildDays, historyWindowStartMs, type HistoryDay } f
 import { formatClock, hoursMinutes, clockTime } from './core/activity';
 import { renderTimesheet } from './core/timesheet';
 import { projectIdFromFsPath } from './core/project';
-import { dayKeyLocal } from './core/aggregate';
+import { dayKeyLocal, monthKey } from './core/aggregate';
 
 import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
@@ -374,10 +374,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const months = [...new Set(days.filter((d) => d.sessions.length > 0).map((d) => d.date.slice(0, 6)))]
       .sort()
       .reverse();
-    const prev = new Date();
-    prev.setDate(1);
-    prev.setMonth(prev.getMonth() - 1);
-    const prevKey = `${prev.getFullYear()}${String(prev.getMonth() + 1).padStart(2, '0')}`;
+    const now = new Date();
+    const prevKey = monthKey(now.getFullYear(), now.getMonth() - 1);
     const defaultMonth = months.includes(prevKey) ? prevKey : (months[0] ?? null);
     const folder = context.workspaceState.get<string>(LAST_FOLDER_KEY) ?? currentFolder?.fsPath ?? '';
     const fileName = defaultMonth ? defaultExportFileName(defaultMonth) : 'timesheet.csv';

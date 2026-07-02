@@ -4,7 +4,7 @@
 // Time counting is already done upstream (cross-window union), so nothing here can double count.
 
 import type { HistoryDay, ManualSpan, Session } from './history';
-import { clockTime, durationHm } from './activity';
+import { clockTime, durationHm, pad2 } from './activity';
 
 /** One output row per contiguous session, or one row per description within each day. */
 export type ExportGranularity = 'session' | 'day';
@@ -33,8 +33,6 @@ export interface TimesheetOptions {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 // Local UTC offset of an instant, split for the various layouts.
 function tzOffset(d: Date): { total: number; sign: string; hh: string; mm: string } {

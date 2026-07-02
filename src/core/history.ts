@@ -3,7 +3,8 @@
 // render fixed windows (last 14 days, last 15 weeks) with missing days zero-filled, so a sparse
 // history never produces a degenerate, blown-up SVG. The adapter adds localized labels on top.
 
-import { aggregateByDay, buildMonthlyBadges, dayKeyLocal, type MonthlyBadges } from './aggregate';
+import { aggregateByDay, buildMonthlyBadges, dayKeyLocal, type DayTotal, type MonthlyBadges } from './aggregate';
+import { pad2 } from './activity';
 import { renderTrend, renderCalendarHeatmap, type DayValue } from './charts';
 import { mergeIntervals, splitAtMidnight, localMidnightOf, type Interval } from './intervals';
 
@@ -171,7 +172,6 @@ function activityRateSeries(tagged: readonly TaggedInterval[], nowMs: number, ho
 
 const hourOf = (ms: number): number => new Date(ms).getHours();
 const minuteOf = (ms: number): number => new Date(ms).getMinutes();
-const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 // Continuous, Monday-aligned, zero-filled window of about `weeks` weeks ending at endMs.
 // Carries the commit count per day so the heatmap tooltip can show it.
@@ -211,7 +211,16 @@ export function buildDays(
   tagged: readonly TaggedInterval[],
   commitsByDay: Readonly<Record<string, number>>,
 ): HistoryDay[] {
-  const perDay = aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end })));
+  return daysFrom(aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end }))), tagged, commitsByDay);
+}
+
+// Body of buildDays with the per-day aggregation precomputed, so buildHistoryModel can run that
+// full split-at-midnight + union pass once and feed both the day list and the monthly badges.
+function daysFrom(
+  perDay: readonly DayTotal[],
+  tagged: readonly TaggedInterval[],
+  commitsByDay: Readonly<Record<string, number>>,
+): HistoryDay[] {
   const breakdown = breakdownByDay(tagged);
   const reasons = reasonsByDay(tagged);
 
@@ -238,7 +247,8 @@ export function buildHistoryModel(
   nowMs: number,
 ): HistoryModel {
   const now = new Date(nowMs);
-  const days = buildDays(tagged, commitsByDay);
+  const perDay = aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end })));
+  const days = daysFrom(perDay, tagged, commitsByDay);
   const byDay = new Map<string, number>(days.map((d) => [d.date, d.seconds]));
 
   // 24h activity-density curve. Many close samples make it genuinely smooth; the value plotted is
@@ -257,10 +267,6 @@ export function buildHistoryModel(
     days,
     trendSvg,
     heatmapSvg: renderCalendarHeatmap(heatmapSeries(byDay, commitsByDay, nowMs, HEATMAP_WEEKS)),
-    months: buildMonthlyBadges(
-      aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end }))),
-      now.getFullYear(),
-      now.getMonth(),
-    ),
+    months: buildMonthlyBadges(perDay, now.getFullYear(), now.getMonth()),
   };
 }

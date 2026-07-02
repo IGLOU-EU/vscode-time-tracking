@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildHistoryModel, historyWindowStartMs, type TaggedInterval } from './history';
+import { buildDays, buildHistoryModel, historyWindowStartMs, type TaggedInterval } from './history';
 
 const at = (y: number, mo1: number, d: number, hh = 0, mm = 0): number =>
   new Date(y, mo1 - 1, d, hh, mm, 0, 0).getTime();
@@ -192,6 +192,24 @@ describe('buildHistoryModel', () => {
     expect(model.days[1].manual).toEqual([
       { start: at(2026, 6, 16), end: at(2026, 6, 16, 1), reason: 'Deploy' },
     ]);
+  });
+});
+
+describe('buildDays', () => {
+  // The export path calls buildDays directly (no charts, commits irrelevant).
+  it('builds the day models on its own, with commits defaulting to zero', () => {
+    const intervals: TaggedInterval[] = [
+      tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)),
+      { windowId: 'w1', start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' },
+    ];
+    const days = buildDays(intervals, {});
+    expect(days).toHaveLength(1);
+    expect(days[0]).toMatchObject({ date: '20260616', seconds: h(3) / 1000, commits: 0 });
+    expect(days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11) },
+      { start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' },
+    ]);
+    expect(days[0].manual).toEqual([{ start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' }]);
   });
 });
 

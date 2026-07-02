@@ -67,7 +67,8 @@ export function percentVariation(current: number, previous: number): number | nu
   return ((current - previous) / previous) * 100;
 }
 
-function monthKey(year: number, month0: number): string {
+/** YYYYMM key of a month. The Date constructor absorbs an out-of-range month (year rollover). */
+export function monthKey(year: number, month0: number): string {
   const d = new Date(year, month0, 1);
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
