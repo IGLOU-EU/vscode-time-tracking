@@ -92,11 +92,16 @@ export class StorageAdapter {
   // every valid open marker. The core merges them (and breaks them down per window) at read time.
   // `sinceMs`, when given, bounds the read to the rendered window: files for an earlier day are
   // skipped instead of read. A one-day slack absorbs a session that started just before the window
-  // (it is stored under its start day). Open markers are current, so they are always read.
-  async readAllTagged(projectId: string, sinceMs?: number): Promise<TaggedInterval[]> {
+  // (it is stored under its start day). Open markers hold in-progress, provisional time: the live
+  // views want them (`includeOpen` defaults to true), a permanent artifact like the timesheet
+  // export must not freeze them in.
+  async readAllTagged(
+    projectId: string,
+    opts?: { sinceMs?: number; includeOpen?: boolean },
+  ): Promise<TaggedInterval[]> {
     const dir = this.projectDir(projectId);
     const today = dayKeyLocal(Date.now());
-    const minDay = sinceMs === undefined ? undefined : dayKeyLocal(sinceMs - 86_400_000);
+    const minDay = opts?.sinceMs === undefined ? undefined : dayKeyLocal(opts.sinceMs - 86_400_000);
     const out: TaggedInterval[] = [];
     const seen = new Set<string>();
     for (const [name, type] of await this.list(dir)) {
@@ -125,7 +130,7 @@ export class StorageAdapter {
         }));
         if (settled) this.parseCache.set(key, parsed);
         out.push(...parsed);
-      } else if (name.endsWith('.open.json')) {
+      } else if (name.endsWith('.open.json') && opts?.includeOpen !== false) {
         const marker = await this.readJson<OpenMarker>(file);
         if (marker && marker.end > marker.start) {
           out.push({ windowId: marker.windowId, start: marker.start, end: marker.end });

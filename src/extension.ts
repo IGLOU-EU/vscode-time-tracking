@@ -351,7 +351,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   async function allExportDays(): Promise<HistoryDay[]> {
     if (!currentProjectId) return [];
-    return buildDays(await storage.readAllTagged(currentProjectId), {});
+    // No open markers: the export is a permanent snapshot, so it only carries committed time (the
+    // in-progress session may still be re-cut or discarded as below the minimum session length).
+    return buildDays(await storage.readAllTagged(currentProjectId, { includeOpen: false }), {});
   }
 
   function monthLabel(value: string): string {
@@ -439,7 +441,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const now = new Date();
     // Only read what the charts and badges actually cover, not the whole history.
     const sinceMs = historyWindowStartMs(now.getTime());
-    const tagged = await storage.readAllTagged(currentProjectId, sinceMs);
+    const tagged = await storage.readAllTagged(currentProjectId, { sinceMs });
     let commits: Record<string, number> = {};
     if (commitCounts && currentFolder) {
       commits = await commitCounts.byDay(currentFolder, gitEmail, sinceMs).catch(() => ({}));

@@ -80,6 +80,36 @@ suite('StorageAdapter (real fs)', () => {
     assert.strictEqual((await makeAdapter('w1').readAllTagged(PROJECT)).length, 2);
   });
 
+  test('re-reads a settled file after its own append (manual entry to a past day)', async () => {
+    const a = makeAdapter('w1');
+    await a.ensureDir(PROJECT);
+    const start = daysAgo(2);
+    await a.appendInterval(PROJECT, { start, end: start + HOUR });
+    assert.strictEqual((await a.readAllTagged(PROJECT)).length, 1); // parses and caches the file
+
+    // Append through the adapter, like a manual entry for that past day.
+    await a.appendInterval(PROJECT, { start: start + 2 * HOUR, end: start + 3 * HOUR }, 'Meeting');
+
+    // The writer evicted its own cache entry: the very next read sees the new entry.
+    const read = await a.readAllTagged(PROJECT);
+    assert.strictEqual(read.length, 2);
+    assert.strictEqual(read[1].reason, 'Meeting');
+  });
+
+  test('excludes the open markers when includeOpen is false (timesheet export)', async () => {
+    const a = makeAdapter('w1');
+    await a.ensureDir(PROJECT);
+    const start = daysAgo(2);
+    await a.appendInterval(PROJECT, { start, end: start + HOUR });
+    const openStart = Date.now() - HOUR;
+    await a.writeOpenMarker(PROJECT, { start: openStart, end: openStart + HOUR / 2 }, Date.now());
+
+    assert.strictEqual((await a.readAllTagged(PROJECT)).length, 2); // live views see the marker
+    const committed = await a.readAllTagged(PROJECT, { includeOpen: false });
+    assert.strictEqual(committed.length, 1); // the export only carries committed time
+    assert.strictEqual(committed[0].start, start);
+  });
+
   test('skips files whose day is older than the rendered window', async () => {
     const a = makeAdapter('w1');
     await a.ensureDir(PROJECT);
@@ -88,7 +118,7 @@ suite('StorageAdapter (real fs)', () => {
     await a.appendInterval(PROJECT, { start: old, end: old + HOUR });
     await a.appendInterval(PROJECT, { start: recent, end: recent + HOUR });
 
-    const read = await a.readAllTagged(PROJECT, daysAgo(100));
+    const read = await a.readAllTagged(PROJECT, { sinceMs: daysAgo(100) });
     assert.strictEqual(read.length, 1);
     assert.strictEqual(read[0].start, recent);
   });
@@ -101,7 +131,7 @@ suite('StorageAdapter (real fs)', () => {
     await a.appendInterval(PROJECT, { start: boundary, end: boundary + HOUR });
     await a.appendInterval(PROJECT, { start: tooOld, end: tooOld + HOUR });
 
-    const read = await a.readAllTagged(PROJECT, daysAgo(100));
+    const read = await a.readAllTagged(PROJECT, { sinceMs: daysAgo(100) });
     assert.strictEqual(read.length, 1);
     assert.strictEqual(read[0].start, boundary);
   });
