@@ -9,12 +9,18 @@ const at = (y: number, mo1: number, d: number, hh = 0, mm = 0): number =>
 const DAY = at(2026, 7, 1);
 const MOMENT = at(2026, 7, 1, 9, 5);
 
-const dayModel = (date: string, sessions: HistoryDay['sessions'], seconds: number): HistoryDay => ({
+const dayModel = (
+  date: string,
+  sessions: HistoryDay['sessions'],
+  seconds: number,
+  manual: HistoryDay['manual'] = [],
+): HistoryDay => ({
   date,
   seconds,
   commits: 0,
   sessions,
   windows: [],
+  manual,
 });
 
 describe('formatExportDate', () => {
@@ -78,6 +84,7 @@ describe('buildTimesheetRows', () => {
           { start: at(2026, 7, 1, 14), end: at(2026, 7, 1, 15), reason: 'Meeting' },
         ],
         3 * 3600,
+        [{ start: at(2026, 7, 1, 14), end: at(2026, 7, 1, 15), reason: 'Meeting' }],
       ),
     ];
     const rows = buildTimesheetRows(days, 'session', 'Development', true);
@@ -95,6 +102,7 @@ describe('buildTimesheetRows', () => {
         { start: at(2026, 7, 1, 15), end: at(2026, 7, 1, 17) }, // untagged -> Development, 2h
       ],
       7 * 3600,
+      [{ start: at(2026, 7, 1, 13), end: at(2026, 7, 1, 15), reason: 'Conference' }],
     ),
   ];
 
@@ -116,6 +124,95 @@ describe('buildTimesheetRows', () => {
     expect(buildTimesheetRows([dayModel('20260701', [], 0)], 'session', 'Development', true)).toEqual([]);
     expect(buildTimesheetRows([dayModel('20260701', [], 0)], 'day', 'Development', true)).toEqual([]);
   });
+
+  // Per-source attribution: a manual entry's reason applies to its own span only, never to the
+  // auto-tracked time merged into the same block.
+  const overlapDay = (manual: HistoryDay['manual']) => [
+    dayModel(
+      '20260701',
+      [{ start: at(2026, 7, 1, 9), end: at(2026, 7, 1, 12), reason: 'Meeting' }], // merged auto 9-11 + manual 10-12
+      3 * 3600,
+      manual,
+    ),
+  ];
+
+  it('attributes only its own span to a manual entry overlapping auto time (session granularity)', () => {
+    const manual = [{ start: at(2026, 7, 1, 10), end: at(2026, 7, 1, 12), reason: 'Meeting' }];
+    const rows = buildTimesheetRows(overlapDay(manual), 'session', 'Development', true);
+    expect(rows).toEqual([
+      { startMs: at(2026, 7, 1, 9), endMs: at(2026, 7, 1, 10), ms: 3_600_000, reason: 'Development' },
+      { startMs: at(2026, 7, 1, 10), endMs: at(2026, 7, 1, 12), ms: 2 * 3_600_000, reason: 'Meeting' },
+    ]);
+  });
+
+  it('attributes only its own span to a manual entry overlapping auto time (day granularity)', () => {
+    const manual = [{ start: at(2026, 7, 1, 10), end: at(2026, 7, 1, 12), reason: 'Meeting' }];
+    const rows = buildTimesheetRows(overlapDay(manual), 'day', 'Development', true);
+    expect(rows).toEqual([
+      { startMs: at(2026, 7, 1, 9), endMs: at(2026, 7, 1, 10), ms: 3_600_000, reason: 'Development' },
+      { startMs: at(2026, 7, 1, 10), endMs: at(2026, 7, 1, 12), ms: 2 * 3_600_000, reason: 'Meeting' },
+    ]);
+  });
+
+  it('splits around a manual entry in the middle of a block', () => {
+    const days = [
+      dayModel(
+        '20260701',
+        [{ start: at(2026, 7, 1, 9), end: at(2026, 7, 1, 17), reason: 'Meeting' }],
+        8 * 3600,
+        [{ start: at(2026, 7, 1, 12), end: at(2026, 7, 1, 12, 30), reason: 'Meeting' }],
+      ),
+    ];
+    const rows = buildTimesheetRows(days, 'session', 'Development', true);
+    expect(rows.map((r) => [r.reason, r.ms / 60_000])).toEqual([
+      ['Development', 180],
+      ['Meeting', 30],
+      ['Development', 270],
+    ]);
+  });
+
+  it('merges adjacent same-reason manual spans into one row', () => {
+    const days = [
+      dayModel(
+        '20260701',
+        [{ start: at(2026, 7, 1, 9), end: at(2026, 7, 1, 12), reason: 'Meeting' }],
+        3 * 3600,
+        [
+          { start: at(2026, 7, 1, 10), end: at(2026, 7, 1, 11), reason: 'Meeting' },
+          { start: at(2026, 7, 1, 11), end: at(2026, 7, 1, 12), reason: 'Meeting' },
+        ],
+      ),
+    ];
+    const rows = buildTimesheetRows(days, 'session', 'Development', true);
+    expect(rows).toEqual([
+      { startMs: at(2026, 7, 1, 9), endMs: at(2026, 7, 1, 10), ms: 3_600_000, reason: 'Development' },
+      { startMs: at(2026, 7, 1, 10), endMs: at(2026, 7, 1, 12), ms: 2 * 3_600_000, reason: 'Meeting' },
+    ]);
+  });
+
+  it('joins overlapping manual reasons on their overlap only', () => {
+    const days = [
+      dayModel(
+        '20260701',
+        [{ start: at(2026, 7, 1, 9), end: at(2026, 7, 1, 13), reason: 'Meeting, Review' }],
+        4 * 3600,
+        [
+          { start: at(2026, 7, 1, 10), end: at(2026, 7, 1, 12), reason: 'Meeting' },
+          { start: at(2026, 7, 1, 11), end: at(2026, 7, 1, 13), reason: 'Review' },
+        ],
+      ),
+    ];
+    const rows = buildTimesheetRows(days, 'session', 'Development', true);
+    expect(rows.map((r) => r.reason)).toEqual(['Development', 'Meeting', 'Meeting, Review', 'Review']);
+    expect(rows.map((r) => r.ms)).toEqual([3_600_000, 3_600_000, 3_600_000, 3_600_000]);
+  });
+
+  it('keeps whole blocks when byReason is false (no reason rendered, no invisible split)', () => {
+    const manual = [{ start: at(2026, 7, 1, 10), end: at(2026, 7, 1, 12), reason: 'Meeting' }];
+    const rows = buildTimesheetRows(overlapDay(manual), 'session', 'Development', false);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ startMs: at(2026, 7, 1, 9), endMs: at(2026, 7, 1, 12), ms: 3 * 3_600_000 });
+  });
 });
 
 describe('renderTimesheet', () => {
@@ -127,6 +224,7 @@ describe('renderTimesheet', () => {
         { start: at(2026, 7, 1, 14), end: at(2026, 7, 1, 15), reason: 'Meeting' },
       ],
       2.5 * 3600,
+      [{ start: at(2026, 7, 1, 14), end: at(2026, 7, 1, 15), reason: 'Meeting' }],
     ),
   ];
 
@@ -186,9 +284,23 @@ describe('renderTimesheet', () => {
   });
 
   it('quotes a cell whose value contains the separator', () => {
-    const withComma = [dayModel('20260701', [{ start: at(2026, 7, 1, 9), end: at(2026, 7, 1, 10), reason: 'Meeting, Review' }], 3600)];
+    const span = { start: at(2026, 7, 1, 9), end: at(2026, 7, 1, 10), reason: 'Meeting, Review' };
+    const withComma = [dayModel('20260701', [span], 3600, [span])];
     const csv = renderTimesheet(withComma, { ...BASE, columns: cols(['', '{reason}'], ['', '{hours}']) });
     expect(csv).toBe('"Meeting, Review",1.00\n');
+  });
+
+  it('exports the auto time around a manual entry under the default reason, not the entry reason', () => {
+    const overlap = [
+      dayModel(
+        '20260701',
+        [{ start: at(2026, 7, 1, 9), end: at(2026, 7, 1, 12), reason: 'Meeting' }],
+        3 * 3600,
+        [{ start: at(2026, 7, 1, 10), end: at(2026, 7, 1, 12), reason: 'Meeting' }],
+      ),
+    ];
+    const csv = renderTimesheet(overlap, { ...BASE, granularity: 'day', columns: cols(['', '{reason}'], ['', '{hours}']) });
+    expect(csv).toBe('Development,1.00\nMeeting,2.00\n');
   });
 
   it('returns an empty string (no header either) when there is nothing to export', () => {

@@ -155,6 +155,44 @@ describe('buildHistoryModel', () => {
       { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11), reason: 'Meeting, Review' },
     ]);
   });
+
+  it('exposes the day manual spans so the export can attribute time by source', () => {
+    const intervals: TaggedInterval[] = [
+      tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)), // auto
+      { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' },
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].manual).toEqual([
+      { start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' },
+    ]);
+  });
+
+  it('keeps the manual spans empty for purely auto-tracked days', () => {
+    const model = buildHistoryModel([tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 10))], {}, NOW);
+    expect(model.days[0].manual).toEqual([]);
+  });
+
+  it('orders the manual spans by start time regardless of input order', () => {
+    const intervals: TaggedInterval[] = [
+      { windowId: 'w1', start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Review' },
+      { windowId: 'w1', start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].manual.map((m) => m.reason)).toEqual(['Meeting', 'Review']);
+  });
+
+  it('splits a cross-midnight manual span onto both days', () => {
+    const intervals: TaggedInterval[] = [
+      { windowId: 'w1', start: at(2026, 6, 15, 23), end: at(2026, 6, 16, 1), reason: 'Deploy' },
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].manual).toEqual([
+      { start: at(2026, 6, 15, 23), end: at(2026, 6, 16), reason: 'Deploy' },
+    ]);
+    expect(model.days[1].manual).toEqual([
+      { start: at(2026, 6, 16), end: at(2026, 6, 16, 1), reason: 'Deploy' },
+    ]);
+  });
 });
 
 describe('historyWindowStartMs', () => {
