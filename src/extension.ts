@@ -2,14 +2,12 @@
 // every Disposable on context.subscriptions; deactivate() flushes the open interval.
 import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
-import * as path from 'node:path';
 
 import { createTracker, type Tracker } from './core/tracker';
-import { buildHistoryModel, buildDays, historyWindowStartMs, type HistoryDay } from './core/history';
+import { buildHistoryModel, historyWindowStartMs } from './core/history';
 import { formatClock, hoursMinutes, clockTime } from './core/activity';
-import { renderTimesheet } from './core/timesheet';
 import { projectIdFromFsPath } from './core/project';
-import { dayKeyLocal, monthKey } from './core/aggregate';
+import { dayKeyLocal } from './core/aggregate';
 
 import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
@@ -17,7 +15,8 @@ import { StorageAdapter } from './adapters/storage';
 import { registerSignals } from './adapters/signals';
 import { getGitApi, CommitCounts } from './adapters/git';
 import { HistoryViewProvider, type HistoryPayload, type HistoryDataPort } from './adapters/history-view';
-import type { ManualEntryInput, ExportOpen, ExportRequest } from './adapters/history-view';
+import type { ManualEntryInput } from './adapters/history-view';
+import { createExportFlow } from './adapters/export';
 import { parseYmd, parseHhMm, composeInterval, normalizeReason } from './core/manual-entry';
 import { createLogger } from './adapters/logger';
 
@@ -67,13 +66,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let lastActivityTickAt = 0; // coalesces bursty activity (one keystroke fires 3 events)
   let lastTickAt = 0; // wall-clock of the last time we advanced the tracker, to spot a host suspend
 
+  // Timesheet export flow, fed with the live project and settings.
+  const exportFlow = createExportFlow(storage, context.workspaceState, logger, {
+    getProjectId: () => currentProjectId,
+    getFolderPath: () => currentFolder?.fsPath,
+    getSettings: () => ({
+      projectName,
+      columns: exportColumns,
+      separator: exportSeparator,
+      dateFormat: exportDateFormat,
+      defaultReason,
+    }),
+  });
+
   // History data port: the pure model, formatted with localized labels, plus the manual-entry flow.
   const dataPort: HistoryDataPort = {
     buildPayload: () => buildPayload(),
     submitManualEntry: (input) => submitManualEntry(input),
-    getExportOpen: () => getExportOpen(),
-    browseExportPath: (suggested) => browseExportPath(suggested),
-    runExport: (request) => runExport(request),
+    getExportOpen: exportFlow.getExportOpen,
+    browseExportPath: exportFlow.browseExportPath,
+    runExport: exportFlow.runExport,
   };
   const historyProvider = new HistoryViewProvider(context.extensionUri, dataPort);
   context.subscriptions.push(
@@ -341,87 +353,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logger.log('manual', { start: interval.start, end: interval.end, reason });
     await storage.appendInterval(pid, interval, reason);
     refreshHistory();
-    return null;
-  }
-
-  // Timesheet export. The whole history is read (no window bound) and reduced to the selected month.
-  // rendering is a pure core concern. The last output folder is remembered per project in
-  // workspaceState (silent, not a user-facing setting).
-  const LAST_FOLDER_KEY = 'export.lastFolder';
-
-  async function allExportDays(): Promise<HistoryDay[]> {
-    if (!currentProjectId) return [];
-    // No open markers: the export is a permanent snapshot, so it only carries committed time (the
-    // in-progress session may still be re-cut or discarded as below the minimum session length).
-    return buildDays(await storage.readAllTagged(currentProjectId, { includeOpen: false }), {});
-  }
-
-  function monthLabel(value: string): string {
-    const date = new Date(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, 1);
-    return new Intl.DateTimeFormat(vscode.env.language, { month: 'long', year: 'numeric' }).format(date);
-  }
-
-  function defaultExportFileName(value: string): string {
-    const year = value.slice(0, 4);
-    const monthName = new Intl.DateTimeFormat('en', { month: 'long' }).format(
-      new Date(Number(year), Number(value.slice(4, 6)) - 1, 1),
-    );
-    return `${year}_${monthName}_timesheet.csv`;
-  }
-
-  async function getExportOpen(): Promise<ExportOpen> {
-    const days = await allExportDays();
-    const months = [...new Set(days.filter((d) => d.sessions.length > 0).map((d) => d.date.slice(0, 6)))]
-      .sort()
-      .reverse();
-    const now = new Date();
-    const prevKey = monthKey(now.getFullYear(), now.getMonth() - 1);
-    const defaultMonth = months.includes(prevKey) ? prevKey : (months[0] ?? null);
-    const folder = context.workspaceState.get<string>(LAST_FOLDER_KEY) ?? currentFolder?.fsPath ?? '';
-    const fileName = defaultMonth ? defaultExportFileName(defaultMonth) : 'timesheet.csv';
-    return {
-      months: months.map((value) => ({ value, label: monthLabel(value) })),
-      defaultMonth,
-      defaultPath: folder ? path.join(folder, fileName) : fileName,
-    };
-  }
-
-  async function browseExportPath(suggested: string): Promise<string | null> {
-    const uri = await vscode.window.showSaveDialog({
-      defaultUri: vscode.Uri.file(suggested),
-      filters: { CSV: ['csv'] },
-      saveLabel: vscode.l10n.t('Export'),
-    });
-    return uri ? uri.fsPath : null;
-  }
-
-  async function runExport(request: ExportRequest): Promise<string | null> {
-    if (!currentProjectId) return vscode.l10n.t('Open a project folder to export.');
-    // Bound the read to the exported month instead of re-reading the whole history (the modal
-    // already paid that full read for the month list). The one-day slack of readAllTagged brings
-    // in a session started on the eve, and the day filter then keeps exactly the month.
-    const monthStart = new Date(Number(request.month.slice(0, 4)), Number(request.month.slice(4, 6)) - 1, 1).getTime();
-    const tagged = await storage.readAllTagged(currentProjectId, { sinceMs: monthStart, includeOpen: false });
-    const days = buildDays(tagged, {}).filter((d) => d.date.slice(0, 6) === request.month);
-    const project = projectName || (currentFolder ? path.basename(currentFolder.fsPath) : 'project');
-    const csv = renderTimesheet(days, {
-      granularity: request.granularity,
-      columns: exportColumns,
-      separator: exportSeparator,
-      dateFormat: exportDateFormat,
-      project,
-      defaultReason,
-    });
-    if (!csv) return vscode.l10n.t('No tracked time for this month.');
-    const target = path.isAbsolute(request.path) ? request.path : path.join(currentFolder?.fsPath ?? '', request.path);
-    try {
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(target), new TextEncoder().encode(csv));
-    } catch (e) {
-      return vscode.l10n.t('Could not write the file: {error}', { error: String(e) });
-    }
-    await context.workspaceState.update(LAST_FOLDER_KEY, path.dirname(target));
-    logger.log('export', { month: request.month, granularity: request.granularity, path: target });
-    void vscode.window.showInformationMessage(vscode.l10n.t('Timesheet exported to {path}', { path: target }));
     return null;
   }
 
