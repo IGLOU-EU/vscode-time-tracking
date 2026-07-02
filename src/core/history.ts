@@ -42,11 +42,11 @@ export interface TaggedInterval {
   readonly reason?: string;
 }
 
-/** A day's work block. Carries a reason when a manual entry contributed to it. */
+/** A displayed work session piece. Carries a reason when a manual entry covers exactly this span. */
 export type Session = Interval & { reason?: string };
 
 /** A manual entry's span within one local day, always carrying its reason. */
-export type ManualSpan = Interval & { reason: string };
+type ManualSpan = Interval & { reason: string };
 
 /** One window's contribution to a day: its merged active ranges and total. */
 export interface WindowBreakdown {
@@ -59,16 +59,15 @@ export interface HistoryDay {
   readonly date: string; // YYYYMMDD
   readonly seconds: number;
   readonly commits: number;
-  /** The day's contiguous work blocks (cross-window union), ordered. Each one is a session. */
+  /**
+   * The day's displayed sessions, ordered and pairwise disjoint (their sum is the day total).
+   * Overlapping windows show as separate sessions (each window runs its own tracker), the overlap
+   * staying with the earlier window, and a manual entry's reason labels exactly its own span, so
+   * both the panel and the timesheet export read time attributed to its actual source.
+   */
   readonly sessions: Session[];
   /** Per-window detail. Length > 1 means several windows worked the project that day. */
   readonly windows: WindowBreakdown[];
-  /**
-   * The day's manual entry spans (midnight-split, ordered by start). The sessions above only carry
-   * a merged label, so the timesheet export needs these to attribute time by source: a manual
-   * reason covers its own span, not the auto-tracked time merged into the same block.
-   */
-  readonly manual: ManualSpan[];
 }
 
 export interface HistoryModel {
@@ -128,15 +127,62 @@ function reasonsByDay(tagged: readonly TaggedInterval[]): Map<string, ManualSpan
   return out;
 }
 
-// Attach to each merged session block the distinct reasons of the manual entries it overlaps.
-function labelSessions(blocks: readonly Interval[], reasons: readonly ManualSpan[]): Session[] {
-  return blocks.map((block) => {
-    const names = reasons
-      .filter((r) => r.start < block.end && r.end > block.start)
-      .map((r) => r.reason);
-    if (names.length === 0) return block;
-    return { ...block, reason: [...new Set(names)].join(', ') };
-  });
+// Pieces of `iv` not already claimed by `covered` (merged, ordered intervals).
+function subtractCovered(iv: Interval, covered: readonly Interval[]): Interval[] {
+  const out: Interval[] = [];
+  let cursor = iv.start;
+  for (const c of covered) {
+    if (c.end <= cursor) continue;
+    if (c.start >= iv.end) break;
+    if (c.start > cursor) out.push({ start: cursor, end: c.start });
+    cursor = c.end;
+    if (cursor >= iv.end) break;
+  }
+  if (cursor < iv.end) out.push({ start: cursor, end: iv.end });
+  return out;
+}
+
+// Each window runs its own tracker, so overlapping windows are separate sessions, not one merged
+// block. The overlap stays with the window that started earlier (the list is ordered by first
+// range), so the pieces are disjoint and their sum matches the linear day total.
+function disjointWindowSessions(windows: readonly WindowBreakdown[]): Interval[] {
+  const out: Interval[] = [];
+  let covered: Interval[] = [];
+  for (const w of windows) {
+    for (const r of w.ranges) out.push(...subtractCovered(r, covered));
+    covered = mergeIntervals([...covered, ...w.ranges]);
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
+
+// Split the blocks at the manual-entry boundaries so a reason labels exactly its own span
+// (overlapping entries join their names). Contiguous pieces with the same label fold back into
+// one session: a manual entry is one user-declared block even across two windows. Unlabeled
+// pieces never fold, so the window separation above stays visible.
+function splitByManual(blocks: readonly Interval[], manual: readonly ManualSpan[]): Session[] {
+  const out: Session[] = [];
+  for (const block of blocks) {
+    const covering = manual.filter((m) => m.start < block.end && m.end > block.start);
+    const cuts = [
+      ...new Set([
+        block.start,
+        block.end,
+        ...covering.flatMap((m) => [Math.max(m.start, block.start), Math.min(m.end, block.end)]),
+      ]),
+    ].sort((a, b) => a - b);
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const [start, end] = [cuts[i], cuts[i + 1]];
+      const names = [...new Set(covering.filter((m) => m.start < end && m.end > start).map((m) => m.reason))];
+      const reason = names.length > 0 ? names.join(', ') : undefined;
+      const prev = out[out.length - 1];
+      if (prev && prev.reason !== undefined && prev.reason === reason && prev.end === start) {
+        prev.end = end;
+      } else {
+        out.push(reason === undefined ? { start, end } : { start, end, reason });
+      }
+    }
+  }
+  return out;
 }
 
 /** One sample of the 24h activity curve: its instant and the activity rate (0 = idle, 1 = full). */
@@ -226,17 +272,14 @@ function daysFrom(
 
   return perDay.map((d) => {
     const windows = breakdown.get(d.date) ?? [];
-    const manual = reasons.get(d.date) ?? [];
     return {
       date: d.date,
       seconds: Math.round(d.ms / 1000),
       commits: commitsByDay[d.date] ?? 0,
-      // The displayed sessions are the cross-window union, so they match the day total and
-      // overlapping windows never show as two separate sessions. A manual entry's reason labels
-      // the block it falls in.
-      sessions: labelSessions(mergeIntervals(windows.flatMap((w) => w.ranges)), manual),
+      // Disjoint pieces (per window, then per manual reason), so the displayed sessions sum to the
+      // day total and each label covers exactly its own span.
+      sessions: splitByManual(disjointWindowSessions(windows), reasons.get(d.date) ?? []),
       windows,
-      manual,
     };
   });
 }

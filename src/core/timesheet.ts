@@ -3,7 +3,7 @@
 // format, a date preset and the project name. This file does the token substitution and formatting.
 // Time counting is already done upstream (cross-window union), so nothing here can double count.
 
-import type { HistoryDay, ManualSpan, Session } from './history';
+import type { HistoryDay } from './history';
 import { clockTime, durationHm, pad2 } from './activity';
 
 /** One output row per contiguous session, or one row per description within each day. */
@@ -102,47 +102,14 @@ interface Row {
 }
 
 /**
- * Attribute a merged block's time by source: each manual span keeps its own reason over its own
- * range (overlapping spans join their names), and the rest of the block falls back to
- * `defaultReason`, so the auto-tracked time around a manual entry is never counted under the
- * entry's reason. Adjacent same-reason pieces merge back into one row.
- */
-function splitBlockByReason(block: Session, manual: readonly ManualSpan[], defaultReason: string): Row[] {
-  const covering = manual.filter((m) => m.start < block.end && m.end > block.start);
-  if (covering.length === 0) {
-    return [{ startMs: block.start, endMs: block.end, ms: block.end - block.start, reason: defaultReason }];
-  }
-  const cuts = [
-    ...new Set([
-      block.start,
-      block.end,
-      ...covering.flatMap((m) => [Math.max(m.start, block.start), Math.min(m.end, block.end)]),
-    ]),
-  ].sort((a, b) => a - b);
-  const rows: Row[] = [];
-  for (let i = 0; i + 1 < cuts.length; i++) {
-    const [a, b] = [cuts[i], cuts[i + 1]];
-    const names = [...new Set(covering.filter((m) => m.start < b && m.end > a).map((m) => m.reason))];
-    const reason = names.length > 0 ? names.join(', ') : defaultReason;
-    const prev = rows[rows.length - 1];
-    if (prev && prev.reason === reason) {
-      prev.endMs = b;
-      prev.ms += b - a;
-    } else {
-      rows.push({ startMs: a, endMs: b, ms: b - a, reason });
-    }
-  }
-  return rows;
-}
-
-/**
- * Turn the day/session model into rows, per the chosen granularity. When `byReason` is set, each
- * block is attributed by source (see splitBlockByReason), so a manual entry only claims its own
- * span and the rest of the block takes `defaultReason`. In `day` mode those pieces are then grouped
- * by reason: same-reason pieces merge into one row (summed time, spanning start/end), different
- * reasons stay separate, so a minority activity is not hidden in an all-day total. When `byReason`
- * is false (the output never shows the reason), the split would add invisible distinctions, so
- * blocks stay whole and the whole day collapses to a single row.
+ * Turn the day/session model into rows, per the chosen granularity. The sessions arrive from
+ * buildDays already split by source (a manual reason labels exactly its own span), so a session
+ * with no reason takes `defaultReason`. In `day` mode, sessions are grouped by that (effective)
+ * reason when `byReason` is set: same-reason sessions merge into one row (summed time, spanning
+ * start/end), different reasons stay separate, so a minority activity is not hidden in an all-day
+ * total. When `byReason` is false (the output never shows the reason), the split would add
+ * invisible distinctions, so touching pieces fold back into whole blocks and the whole day
+ * collapses to a single row.
  */
 export function buildTimesheetRows(
   days: readonly HistoryDay[],
@@ -154,8 +121,13 @@ export function buildTimesheetRows(
   for (const d of days) {
     if (granularity === 'session') {
       for (const s of d.sessions) {
-        if (byReason) rows.push(...splitBlockByReason(s, d.manual, defaultReason));
-        else rows.push({ startMs: s.start, endMs: s.end, ms: s.end - s.start, reason: s.reason || defaultReason });
+        const prev = rows[rows.length - 1];
+        if (!byReason && prev && prev.endMs === s.start) {
+          prev.endMs = s.end;
+          prev.ms += s.end - s.start;
+        } else {
+          rows.push({ startMs: s.start, endMs: s.end, ms: s.end - s.start, reason: s.reason || defaultReason });
+        }
       }
       continue;
     }
@@ -168,14 +140,15 @@ export function buildTimesheetRows(
     }
 
     const groups = new Map<string, { startMs: number; endMs: number; ms: number }>();
-    for (const piece of d.sessions.flatMap((s) => splitBlockByReason(s, d.manual, defaultReason))) {
-      const g = groups.get(piece.reason);
+    for (const s of d.sessions) {
+      const reason = s.reason || defaultReason;
+      const g = groups.get(reason);
       if (g) {
-        g.startMs = Math.min(g.startMs, piece.startMs);
-        g.endMs = Math.max(g.endMs, piece.endMs);
-        g.ms += piece.ms;
+        g.startMs = Math.min(g.startMs, s.start);
+        g.endMs = Math.max(g.endMs, s.end);
+        g.ms += s.end - s.start;
       } else {
-        groups.set(piece.reason, { startMs: piece.startMs, endMs: piece.endMs, ms: piece.ms });
+        groups.set(reason, { startMs: s.start, endMs: s.end, ms: s.end - s.start });
       }
     }
     [...groups.entries()]

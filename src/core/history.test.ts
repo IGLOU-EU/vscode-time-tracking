@@ -108,10 +108,25 @@ describe('buildHistoryModel', () => {
     ]);
   });
 
-  it('merges overlapping sessions across windows into the day work blocks (no double session)', () => {
+  it('shows overlapping windows as distinct sessions, the earlier window keeping the overlap', () => {
+    // Each window runs its own tracker, so two windows are two sessions; the overlap is attributed
+    // once (to the earlier window) so the sessions still sum to the linear day total.
     const intervals = [
       tagged('w1', at(2026, 6, 16, 14), at(2026, 6, 16, 16)),
       tagged('w2', at(2026, 6, 16, 15), at(2026, 6, 16, 17)),
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].seconds).toBe(h(3) / 1000);
+    expect(model.days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 16) },
+      { start: at(2026, 6, 16, 16), end: at(2026, 6, 16, 17) },
+    ]);
+  });
+
+  it('shows no session for a window fully covered by an earlier one', () => {
+    const intervals = [
+      tagged('w1', at(2026, 6, 16, 14), at(2026, 6, 16, 17)),
+      tagged('w2', at(2026, 6, 16, 15), at(2026, 6, 16, 16)),
     ];
     const model = buildHistoryModel(intervals, {}, NOW);
     expect(model.days[0].sessions).toEqual([{ start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 17) }]);
@@ -133,7 +148,7 @@ describe('buildHistoryModel', () => {
     expect(model.days[0].sessions[0]).not.toHaveProperty('reason');
   });
 
-  it('carries the reason onto the merged block when a manual entry overlaps auto time (no double count)', () => {
+  it('labels only the manual span inside a work block, the rest stays unlabeled (no double count)', () => {
     const intervals: TaggedInterval[] = [
       tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)), // auto 2h
       { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' }, // manual, overlaps
@@ -141,55 +156,72 @@ describe('buildHistoryModel', () => {
     const model = buildHistoryModel(intervals, {}, NOW);
     expect(model.days[0].seconds).toBe(h(3) / 1000); // 09:00-12:00 union, counted once
     expect(model.days[0].sessions).toEqual([
-      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12), reason: 'Meeting' },
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10) },
+      { start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' },
     ]);
   });
 
-  it('joins several distinct reasons that fall in the same block', () => {
+  it('splits around a manual entry in the middle of a block', () => {
+    const intervals: TaggedInterval[] = [
+      tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 17)),
+      { windowId: 'w1', start: at(2026, 6, 16, 12), end: at(2026, 6, 16, 12, 30), reason: 'Meeting' },
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12) },
+      { start: at(2026, 6, 16, 12), end: at(2026, 6, 16, 12, 30), reason: 'Meeting' },
+      { start: at(2026, 6, 16, 12, 30), end: at(2026, 6, 16, 17) },
+    ]);
+  });
+
+  it('keeps abutting manual entries as separate sessions, one per reason', () => {
     const intervals: TaggedInterval[] = [
       { windowId: 'w1', start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
       { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 11), reason: 'Review' },
     ];
     const model = buildHistoryModel(intervals, {}, NOW);
     expect(model.days[0].sessions).toEqual([
-      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11), reason: 'Meeting, Review' },
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
+      { start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 11), reason: 'Review' },
     ]);
   });
 
-  it('exposes the day manual spans so the export can attribute time by source', () => {
+  it('joins reasons only where manual entries truly overlap', () => {
     const intervals: TaggedInterval[] = [
-      tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)), // auto
-      { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' },
+      { windowId: 'w1', start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11), reason: 'Meeting' },
+      { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Review' },
     ];
     const model = buildHistoryModel(intervals, {}, NOW);
-    expect(model.days[0].manual).toEqual([
+    expect(model.days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
+      { start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 11), reason: 'Meeting, Review' },
+      { start: at(2026, 6, 16, 11), end: at(2026, 6, 16, 12), reason: 'Review' },
+    ]);
+  });
+
+  it('folds contiguous same-reason pieces from different windows into one labeled session', () => {
+    // The manual entry is one user-declared block even when a second window contributed part of
+    // its span, so the label glues the pieces back together.
+    const intervals: TaggedInterval[] = [
+      tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)),
+      { windowId: 'w2', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' },
+    ];
+    const model = buildHistoryModel(intervals, {}, NOW);
+    expect(model.days[0].sessions).toEqual([
+      { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10) },
       { start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' },
     ]);
   });
 
-  it('keeps the manual spans empty for purely auto-tracked days', () => {
-    const model = buildHistoryModel([tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 10))], {}, NOW);
-    expect(model.days[0].manual).toEqual([]);
-  });
-
-  it('orders the manual spans by start time regardless of input order', () => {
-    const intervals: TaggedInterval[] = [
-      { windowId: 'w1', start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Review' },
-      { windowId: 'w1', start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
-    ];
-    const model = buildHistoryModel(intervals, {}, NOW);
-    expect(model.days[0].manual.map((m) => m.reason)).toEqual(['Meeting', 'Review']);
-  });
-
-  it('splits a cross-midnight manual span onto both days', () => {
+  it('splits a cross-midnight manual entry onto both days, keeping its reason', () => {
     const intervals: TaggedInterval[] = [
       { windowId: 'w1', start: at(2026, 6, 15, 23), end: at(2026, 6, 16, 1), reason: 'Deploy' },
     ];
     const model = buildHistoryModel(intervals, {}, NOW);
-    expect(model.days[0].manual).toEqual([
+    expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 15, 23), end: at(2026, 6, 16), reason: 'Deploy' },
     ]);
-    expect(model.days[1].manual).toEqual([
+    expect(model.days[1].sessions).toEqual([
       { start: at(2026, 6, 16), end: at(2026, 6, 16, 1), reason: 'Deploy' },
     ]);
   });
@@ -209,7 +241,6 @@ describe('buildDays', () => {
       { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11) },
       { start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' },
     ]);
-    expect(days[0].manual).toEqual([{ start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' }]);
   });
 });
 
