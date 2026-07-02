@@ -79,8 +79,12 @@ without explicit human approval, even if a change looks cleaner:
   **composition root** in `src/extension.ts`. The clock (`now`) and
   timezone (`midnightOf`) are injected, never read directly in the core.
 - **One window = one autonomous tracker.** Two windows on the same
-  project each count on their own. Merge (interval union) happens at
-  **read time** for display, never at write time.
+  project each count on their own. Overlap resolution happens at
+  **read time**, never at write time: day totals use the interval
+  union, and the displayed sessions are disjoint pieces (split per
+  window, the overlap staying with the earlier window, then per manual
+  reason, which labels exactly its own span), so the sessions always
+  sum to the day total and the per-session export matches the panel.
 - **Append-only JSONL, one file per window per day**, under
   `globalStorageUri/<sha256(projectPath)>/`. A single writer per file
   (the in-memory `windowId`, never persisted). Read tolerates a

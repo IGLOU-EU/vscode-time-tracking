@@ -5,6 +5,43 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The add-time form shows a live hint ("Ends the next day (16h 00m).") as soon as the typed end
+  precedes the start, so a swapped start/end no longer stores a huge overnight entry silently.
+- The suggested export file name follows the selected month, and a name you customized by hand
+  is never overwritten.
+
+### Changed
+
+- A day's sessions are now split by source. A manual entry's reason labels exactly its own time
+  span instead of the whole block it touches, and two overlapping windows show as two sessions
+  (the overlap counted once, with the earlier window). The listed sessions always sum to the day
+  total, and the per-session export matches the panel.
+- The exported timesheet no longer includes the in-progress session: a permanent file only
+  carries closed time, while the live panel keeps showing the running session.
+- The extension no longer rewrites over-long `manualReasons` values into your settings file; the
+  32-character cap applies when the list is read and when an entry is saved.
+- Exporting a month only reads that month's data instead of re-reading the whole history.
+
+### Fixed
+
+- Exported hours around a manual entry are attributed to the default reason again, instead of
+  crediting the whole merged block to the entry's reason.
+- A manual entry typed on a DST transition day is stored at the typed wall-clock time (it landed
+  one hour off).
+- A manual entry saved for a past day now shows up in the panel immediately.
+- A failed save or export reports its error in the form instead of leaving the button disabled
+  with no message, and a shown validation error disappears as soon as you edit a field.
+- Commit counts now resolve your git email from the global git config too (most setups define it
+  there only), and a count that failed while git was still starting up is retried instead of
+  staying frozen at zero.
+- Reasons and paths containing double quotes are no longer cut short by the forms.
+- An empty export separator falls back to a comma instead of producing an unparseable file.
+- Exporting with an empty file path shows an actionable message instead of the bare field label.
+- The five `exportDateFormat` preset descriptions are localized, and the French translations
+  regain their accents.
+
 ## [1.2.0] - 2026-07-01
 
 ### Added

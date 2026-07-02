@@ -25,7 +25,8 @@ stepping away).
 - **One window = one autonomous tracker.** Two windows open on the same
   project each count on their own. The real worked time is the union of
   both (window 1 from 14:00 to 16:00 plus window 2 from 14:30 to 17:00
-  gives 3 hours).
+  gives 3 hours), and the history lists them as separate sessions with
+  the overlap counted once, so the sessions always sum to the day total.
 - **One project = one folder.** In multi-folder workspaces, time is
   attributed to the folder of the active file.
 - **Automatic, focus-aware tracking.** Counting starts on a real action
