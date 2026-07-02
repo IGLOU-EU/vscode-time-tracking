@@ -24,7 +24,7 @@ export interface ExportColumn {
 export interface TimesheetOptions {
   readonly granularity: ExportGranularity;
   readonly columns: readonly ExportColumn[];
-  readonly separator: string; // joins the columns of a line (and the header)
+  readonly separator: string; // joins the columns of a line (and the header); "" falls back to ","
   readonly dateFormat: ExportDateFormat;
   readonly project: string;
   readonly defaultReason: string; // {reason} value for a session that has none (e.g. plain editor time)
@@ -231,7 +231,9 @@ export function renderTimesheet(days: readonly HistoryDay[], opts: TimesheetOpti
   const byReason = opts.columns.some((c) => c.template.includes('{reason}'));
   const rows = buildTimesheetRows(days, opts.granularity, opts.defaultReason, byReason);
   if (rows.length === 0) return '';
-  const sep = opts.separator;
+  // The setting is free text: an empty separator would quote every cell (''.includes matches
+  // anything) and join them with nothing, so it falls back to a comma.
+  const sep = opts.separator || ',';
   const lines = rows.map((r) => {
     const tokens = rowTokens(r, opts.project, opts.dateFormat);
     return opts.columns.map((c) => csvQuote(renderLine(c.template, tokens), sep)).join(sep);

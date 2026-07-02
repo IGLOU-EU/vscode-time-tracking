@@ -303,6 +303,13 @@ describe('renderTimesheet', () => {
     expect(csv).toBe('Development,1.00\nMeeting,2.00\n');
   });
 
+  it('falls back to a comma when the configured separator is empty', () => {
+    // An empty separator would quote every cell (''.includes matches anything) and join them with
+    // nothing, an unparseable file. The render must stay a well-formed delimited file.
+    const csv = renderTimesheet(days, { ...BASE, separator: '', columns: cols(['', '{date}'], ['', '{hours}']) });
+    expect(csv).toBe('2026-07-01,1.50\n2026-07-01,1.00\n');
+  });
+
   it('returns an empty string (no header either) when there is nothing to export', () => {
     expect(renderTimesheet([dayModel('20260701', [], 0)], BASE)).toBe('');
   });
