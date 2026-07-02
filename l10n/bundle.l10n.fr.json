@@ -20,6 +20,7 @@
   "Save": "Enregistrer",
   "Cancel": "Annuler",
   "Enter a reason.": "Saisissez une raison.",
+  "Ends the next day ({hours}h {minutes}m).": "Se termine le lendemain ({hours} h {minutes} min).",
   "Enter a valid date as YYYY-MM-DD.": "Saisissez une date valide au format AAAA-MM-JJ.",
   "Enter a valid start time as HH:MM.": "Saisissez une heure de debut valide au format HH:MM.",
   "Enter a valid end time as HH:MM.": "Saisissez une heure de fin valide au format HH:MM.",

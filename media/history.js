@@ -168,6 +168,7 @@
       `<label>${esc(s.formStart || 'Start')}<input type="time" id="tt-f-start" /></label>` +
       `<label>${esc(s.formEnd || 'End')}<input type="time" id="tt-f-end" /></label>` +
       `</div>` +
+      `<p class="tt-modal-hint tt-hidden" id="tt-f-nextday"></p>` +
       `<p class="tt-modal-error tt-hidden" id="tt-f-error"></p>` +
       `<div class="tt-modal-actions">` +
       `<button type="button" id="tt-f-cancel">${esc(s.formCancel || 'Cancel')}</button>` +
@@ -187,6 +188,33 @@
     };
     reasonSel.addEventListener('change', () => syncOther(true));
     syncOther(false); // initial state (covers an empty preset list where "Other" is preselected)
+
+    // An end at or before the start rolls over to the next day (night session). Deliberate, but a
+    // swapped start/end would silently store a huge entry, so surface the rollover and its length
+    // before Save.
+    const startIn = /** @type {HTMLInputElement} */ (document.getElementById('tt-f-start'));
+    const endIn = /** @type {HTMLInputElement} */ (document.getElementById('tt-f-end'));
+    const nextDay = document.getElementById('tt-f-nextday');
+    const minutesOf = (/** @type {string} */ v) => {
+      const m = /^(\d{2}):(\d{2})$/.exec(v);
+      return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+    };
+    const syncNextDay = () => {
+      if (!nextDay || !startIn || !endIn) return;
+      const start = minutesOf(startIn.value);
+      const end = minutesOf(endIn.value);
+      const rolls = start !== null && end !== null && end < start;
+      if (rolls) {
+        const total = 24 * 60 - start + end;
+        const tpl = s.formNextDay || 'Ends the next day ({hours}h {minutes}m).';
+        nextDay.textContent = tpl
+          .replace('{hours}', String(Math.floor(total / 60)))
+          .replace('{minutes}', String(total % 60).padStart(2, '0'));
+      }
+      nextDay.classList.toggle('tt-hidden', !rolls);
+    };
+    startIn.addEventListener('input', syncNextDay);
+    endIn.addEventListener('input', syncNextDay);
 
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) closeAddForm();

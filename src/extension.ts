@@ -544,6 +544,7 @@ function historyStrings(): Record<string, string> {
     formOther: vscode.l10n.t('Other…'),
     formOtherReason: vscode.l10n.t('Custom reason'),
     formReasonRequired: vscode.l10n.t('Enter a reason.'),
+    formNextDay: vscode.l10n.t('Ends the next day ({hours}h {minutes}m).'),
     formSave: vscode.l10n.t('Save'),
     formCancel: vscode.l10n.t('Cancel'),
     exportTitle: vscode.l10n.t('Export timesheet'),

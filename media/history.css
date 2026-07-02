@@ -378,6 +378,12 @@ body {
   color: var(--vscode-errorForeground, var(--vscode-charts-red));
 }
 
+.tt-modal-hint {
+  margin: 0;
+  font-size: var(--tt-fs-small);
+  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+}
+
 .tt-modal-actions {
   display: flex;
   justify-content: flex-end;
