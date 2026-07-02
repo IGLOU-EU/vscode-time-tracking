@@ -73,7 +73,7 @@ export function createExportFlow(
     const folder = workspaceState.get<string>(LAST_FOLDER_KEY) ?? ctx.getFolderPath() ?? '';
     const fileName = defaultMonth ? defaultExportFileName(defaultMonth) : 'timesheet.csv';
     return {
-      months: months.map((value) => ({ value, label: monthLabel(value) })),
+      months: months.map((value) => ({ value, label: monthLabel(value), fileName: defaultExportFileName(value) })),
       defaultMonth,
       defaultPath: folder ? path.join(folder, fileName) : fileName,
     };

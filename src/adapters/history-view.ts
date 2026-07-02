@@ -38,6 +38,7 @@ export interface ManualEntryInput {
 export interface ExportMonth {
   value: string; // YYYYMM
   label: string; // localized, e.g. "July 2026"
+  fileName: string; // suggested output file name, so the path can follow the selection
 }
 
 /** What the export modal needs when it opens: the available months and a proposed file path. */

@@ -292,6 +292,7 @@
 
   // Export modal: month + granularity + output path, all editable at once. Shares the modal id and
   // styles with the add form (only one modal is ever open).
+  /** @param {{months?: Array<{value: string, label: string, fileName: string}>, defaultMonth?: string | null, defaultPath?: string}} open */
   function openExportForm(open) {
     closeModal();
     const s = lastStrings;
@@ -338,6 +339,19 @@
     const browse = document.getElementById('tt-x-browse');
     const pathInput = /** @type {HTMLInputElement} */ (document.getElementById('tt-x-path'));
     if (browse) browse.addEventListener('click', () => vscode.postMessage({ type: 'exportBrowse', path: pathInput ? pathInput.value : '' }));
+
+    // The suggested file name follows the month selection, but a name the user customized is
+    // never clobbered (it no longer matches the last auto-set one).
+    const monthSel = /** @type {HTMLSelectElement} */ (document.getElementById('tt-x-month'));
+    let autoName = months.find((m) => m.value === monthSel.value)?.fileName || 'timesheet.csv';
+    monthSel.addEventListener('change', () => {
+      const next = months.find((m) => m.value === monthSel.value)?.fileName;
+      if (!next || !pathInput) return;
+      const val = pathInput.value;
+      const cut = Math.max(val.lastIndexOf('/'), val.lastIndexOf('\\')) + 1;
+      if (val.slice(cut) === autoName) pathInput.value = val.slice(0, cut) + next;
+      autoName = next;
+    });
 
     const form = document.getElementById('tt-x-form');
     if (form) {
