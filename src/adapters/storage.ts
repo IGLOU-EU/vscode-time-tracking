@@ -21,11 +21,11 @@ interface OpenMarker {
 
 export class StorageAdapter {
   // Parsed intervals of settled (past-day) files, keyed by `projectId/filename`. A closed-day file
-  // is append-only and never rewritten (one writer per file, and every window only appends to its
-  // current-day file), so once the day is over it can be parsed once and reused. The current day's
-  // files stay live (any window may still append) and are always re-read, as are the open markers.
-  // watch() evicts any file the OS reports changed, covering the rare post-midnight append to the
-  // previous day's file and edits coming from another window.
+  // is rarely rewritten (one writer per file), so once the day is over it can be parsed once and
+  // reused. The current day's files stay live (any window may still append) and are always re-read,
+  // as are the open markers. Two eviction paths: appendInterval drops its own target (a manual
+  // entry may append to a past day, and the read that follows the save must see it), and watch()
+  // drops any file the OS reports changed (edits from another window, post-midnight appends).
   private readonly parseCache = new Map<string, TaggedInterval[]>();
 
   constructor(
@@ -45,11 +45,12 @@ export class StorageAdapter {
   // auto-tracked intervals, so the whole read/merge/aggregate chain counts it exactly the same.
   async appendInterval(projectId: string, iv: Interval, reason?: string): Promise<void> {
     if (iv.end <= iv.start) return; // nothing to store
-    const file = vscode.Uri.joinPath(
-      this.projectDir(projectId),
-      `${dayKeyLocal(iv.start)}.${this.windowId}.jsonl`,
-    );
+    const name = `${dayKeyLocal(iv.start)}.${this.windowId}.jsonl`;
+    const file = vscode.Uri.joinPath(this.projectDir(projectId), name);
     await this.append(file, serializeLine(toStoredInterval(this.windowId, iv, reason)));
+    // The target may be a settled past-day file (manual entry): drop our own cache entry so the
+    // refresh right after the save re-reads it, instead of waiting on the debounced watcher.
+    this.parseCache.delete(`${projectId}/${name}`);
   }
 
   async writeOpenMarker(projectId: string, iv: Interval | null, now: number): Promise<void> {
