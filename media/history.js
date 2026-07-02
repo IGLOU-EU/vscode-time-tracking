@@ -134,7 +134,8 @@
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
 
-  function closeAddForm() {
+  // The add-time and export forms share the modal id and plumbing: only one modal is ever open.
+  function closeModal() {
     const overlay = document.getElementById('tt-modal');
     if (overlay) overlay.remove();
     document.removeEventListener('keydown', onModalKey);
@@ -142,13 +143,37 @@
 
   /** @param {KeyboardEvent} e */
   function onModalKey(e) {
-    if (e.key === 'Escape') closeAddForm();
+    if (e.key === 'Escape') closeModal();
+  }
+
+  // Cancel button, backdrop click and Escape all dismiss the modal.
+  /** @param {HTMLElement} overlay @param {string} cancelId */
+  function wireModalDismiss(overlay, cancelId) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+    const cancel = document.getElementById(cancelId);
+    if (cancel) cancel.addEventListener('click', closeModal);
+    document.addEventListener('keydown', onModalKey);
+  }
+
+  // Show (or clear) a modal's error line and re-enable its submit button, so a reported failure
+  // never leaves the form locked.
+  /** @param {string} buttonId @param {string} errorId @param {string} [message] */
+  function showModalError(buttonId, errorId, message) {
+    const button = /** @type {HTMLButtonElement} */ (document.getElementById(buttonId));
+    if (button) button.disabled = false;
+    const err = document.getElementById(errorId);
+    if (err) {
+      err.textContent = message || '';
+      err.classList.toggle('tt-hidden', !message);
+    }
   }
 
   // Centered modal form inside the panel: all fields editable at once, with native date/time
   // pickers. Attached to <body> (not #app) so a background refresh that rebuilds #app leaves it open.
   function openAddForm() {
-    closeAddForm(); // never stack two
+    closeModal(); // never stack two
     const s = lastStrings;
     const options =
       lastReasons.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join('') +
@@ -171,8 +196,8 @@
       `<p class="tt-modal-hint tt-hidden" id="tt-f-nextday"></p>` +
       `<p class="tt-modal-error tt-hidden" id="tt-f-error"></p>` +
       `<div class="tt-modal-actions">` +
-      `<button type="button" id="tt-f-cancel">${esc(s.formCancel || 'Cancel')}</button>` +
-      `<button type="submit" id="tt-f-save">${esc(s.formSave || 'Save')}</button>` +
+      `<button type="button" id="tt-f-cancel" class="tt-btn tt-btn-secondary">${esc(s.formCancel || 'Cancel')}</button>` +
+      `<button type="submit" id="tt-f-save" class="tt-btn tt-btn-primary">${esc(s.formSave || 'Save')}</button>` +
       `</div>` +
       `</form>`;
     document.body.appendChild(overlay);
@@ -216,12 +241,7 @@
     startIn.addEventListener('input', syncNextDay);
     endIn.addEventListener('input', syncNextDay);
 
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeAddForm();
-    });
-    const cancel = document.getElementById('tt-f-cancel');
-    if (cancel) cancel.addEventListener('click', closeAddForm);
-    document.addEventListener('keydown', onModalKey);
+    wireModalDismiss(overlay, 'tt-f-cancel');
 
     const form = document.getElementById('tt-form');
     if (form)
@@ -253,19 +273,13 @@
 
   /** @param {string} [message] */
   function showFormError(message) {
-    const save = /** @type {HTMLButtonElement} */ (document.getElementById('tt-f-save'));
-    if (save) save.disabled = false;
-    const err = document.getElementById('tt-f-error');
-    if (err) {
-      err.textContent = message || '';
-      err.classList.toggle('tt-hidden', !message);
-    }
+    showModalError('tt-f-save', 'tt-f-error', message);
   }
 
   // Export modal: month + granularity + output path, all editable at once. Shares the modal id and
   // styles with the add form (only one modal is ever open).
   function openExportForm(open) {
-    closeAddForm();
+    closeModal();
     const s = lastStrings;
     const months = Array.isArray(open.months) ? open.months : [];
     const overlay = document.createElement('div');
@@ -277,10 +291,10 @@
         `<div class="tt-modal">` +
         `<h2>${esc(s.exportTitle || 'Export timesheet')}</h2>` +
         `<p class="tt-modal-error">${esc(s.exportEmpty || 'No data to export yet.')}</p>` +
-        `<div class="tt-modal-actions"><button type="button" id="tt-x-cancel">${esc(s.formCancel || 'Cancel')}</button></div>` +
+        `<div class="tt-modal-actions"><button type="button" id="tt-x-cancel" class="tt-btn tt-btn-secondary">${esc(s.formCancel || 'Cancel')}</button></div>` +
         `</div>`;
       document.body.appendChild(overlay);
-      wireModalDismiss(overlay);
+      wireModalDismiss(overlay, 'tt-x-cancel');
       return;
     }
 
@@ -297,15 +311,15 @@
       `</select></label>` +
       `<label>${esc(s.exportFile || 'File')}` +
       `<span class="tt-modal-file"><input type="text" id="tt-x-path" value="${esc(open.defaultPath || '')}" />` +
-      `<button type="button" id="tt-x-browse">${esc(s.exportBrowse || 'Choose…')}</button></span></label>` +
+      `<button type="button" id="tt-x-browse" class="tt-btn tt-btn-secondary">${esc(s.exportBrowse || 'Choose…')}</button></span></label>` +
       `<p class="tt-modal-error tt-hidden" id="tt-x-error"></p>` +
       `<div class="tt-modal-actions">` +
-      `<button type="button" id="tt-x-cancel">${esc(s.formCancel || 'Cancel')}</button>` +
-      `<button type="submit" id="tt-x-run">${esc(s.exportRun || 'Export')}</button>` +
+      `<button type="button" id="tt-x-cancel" class="tt-btn tt-btn-secondary">${esc(s.formCancel || 'Cancel')}</button>` +
+      `<button type="submit" id="tt-x-run" class="tt-btn tt-btn-primary">${esc(s.exportRun || 'Export')}</button>` +
       `</div>` +
       `</form>`;
     document.body.appendChild(overlay);
-    wireModalDismiss(overlay);
+    wireModalDismiss(overlay, 'tt-x-cancel');
 
     const browse = document.getElementById('tt-x-browse');
     const pathInput = /** @type {HTMLInputElement} */ (document.getElementById('tt-x-path'));
@@ -317,16 +331,6 @@
         e.preventDefault();
         submitExportForm();
       });
-  }
-
-  // Cancel button, backdrop click and Escape all dismiss the modal.
-  function wireModalDismiss(overlay) {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeAddForm();
-    });
-    const cancel = document.getElementById('tt-x-cancel');
-    if (cancel) cancel.addEventListener('click', closeAddForm);
-    document.addEventListener('keydown', onModalKey);
   }
 
   function submitExportForm() {
@@ -344,13 +348,7 @@
 
   /** @param {string} [message] */
   function showExportError(message) {
-    const run = /** @type {HTMLButtonElement} */ (document.getElementById('tt-x-run'));
-    if (run) run.disabled = false;
-    const err = document.getElementById('tt-x-error');
-    if (err) {
-      err.textContent = message || '';
-      err.classList.toggle('tt-hidden', !message);
-    }
+    showModalError('tt-x-run', 'tt-x-error', message);
   }
 
   window.addEventListener('message', (event) => {
@@ -358,13 +356,13 @@
     if (!message) return;
     if (message.type === 'history') render(message.payload);
     else if (message.type === 'entryError') showFormError(message.message);
-    else if (message.type === 'entrySaved') closeAddForm();
+    else if (message.type === 'entrySaved') closeModal();
     else if (message.type === 'exportOpen') openExportForm(message);
     else if (message.type === 'exportPath') {
       const pathInput = /** @type {HTMLInputElement} */ (document.getElementById('tt-x-path'));
       if (pathInput) pathInput.value = message.path;
     } else if (message.type === 'exportError') showExportError(message.message);
-    else if (message.type === 'exportDone') closeAddForm();
+    else if (message.type === 'exportDone') closeModal();
   });
 
   // Tell the extension host the webview is ready to receive data.
