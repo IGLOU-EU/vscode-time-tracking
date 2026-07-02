@@ -25,6 +25,11 @@
   "config.exportColumns.desc": "Columns of the exported timesheet, each as `Name={template}`. The names form the header row; the templates fill each cell. Tokens: `{project}`, `{date}` (per the date format), `{date_start}`, `{date_end}` (start/end datetime, always with the time), `{start}`, `{end}` (HH:MM), `{total}` (H:MM), `{hours}` (decimal), `{minutes}`, `{reason}`. A column with an empty template is a blank cell; unnamed columns drop the header.",
   "config.exportSeparator.desc": "Character that joins the export columns (and the header). Default `,` for CSV.",
   "config.exportDateFormat.desc": "Format of the `{date}` token in the exported timesheet, rendered in the machine's local time. `iso8601` is a bare date; the zoned presets (RFC 3339, RFC 1123, RFC 1123 numeric, RFC 850) carry the row's start time and timezone.",
+  "config.exportDateFormat.iso8601": "Bare date, e.g. 2026-07-01",
+  "config.exportDateFormat.rfc3339": "RFC 3339, e.g. 2026-07-01T09:05:00+02:00",
+  "config.exportDateFormat.rfc1123": "RFC 1123, e.g. Wed, 01 Jul 2026 09:05:00 CEST",
+  "config.exportDateFormat.rfc1123z": "RFC 1123 with numeric zone, e.g. Wed, 01 Jul 2026 09:05:00 +0200",
+  "config.exportDateFormat.rfc850": "RFC 850, e.g. Wednesday, 01-Jul-26 09:05:00 CEST",
   "capabilities.untrusted.desc": "Tracking works in untrusted workspaces, but counting git commits is disabled until the workspace is trusted.",
   "capabilities.virtual.desc": "Tracking stores data and watches files on the local filesystem, so it is limited in virtual workspaces."
 }

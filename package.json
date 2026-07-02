@@ -232,11 +232,11 @@
             "rfc850"
           ],
           "enumDescriptions": [
-            "Bare date, e.g. 2026-07-01",
-            "RFC 3339, e.g. 2026-07-01T09:05:00+02:00",
-            "RFC 1123, e.g. Wed, 01 Jul 2026 09:05:00 CEST",
-            "RFC 1123 with numeric zone, e.g. Wed, 01 Jul 2026 09:05:00 +0200",
-            "RFC 850, e.g. Wednesday, 01-Jul-26 09:05:00 CEST"
+            "%config.exportDateFormat.iso8601%",
+            "%config.exportDateFormat.rfc3339%",
+            "%config.exportDateFormat.rfc1123%",
+            "%config.exportDateFormat.rfc1123z%",
+            "%config.exportDateFormat.rfc850%"
           ],
           "default": "iso8601",
           "scope": "machine-overridable",
