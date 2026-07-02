@@ -58,6 +58,48 @@ describe('composeInterval', () => {
   it('returns null only for a zero-length span (equal start and end)', () => {
     expect(composeInterval(ymd, 10 * 60, 10 * 60)).toBeNull();
   });
+
+  // DST days: the stored instants must render back as the wall-clock times the user typed, not as
+  // midnight plus a fixed number of minutes. TZ is forced so the cases hold on any machine (Node on
+  // POSIX picks up process.env.TZ changes at runtime).
+  describe('across DST transitions (Europe/Paris)', () => {
+    const inParis = (fn: () => void): void => {
+      const prev = process.env.TZ;
+      process.env.TZ = 'Europe/Paris';
+      try {
+        fn();
+      } finally {
+        if (prev === undefined) delete process.env.TZ;
+        else process.env.TZ = prev;
+      }
+    };
+
+    it('keeps the typed wall-clock time on a spring-forward day', () => {
+      inParis(() => {
+        const iv = composeInterval({ year: 2026, month: 3, day: 29 }, 9 * 60, 10 * 60);
+        expect(new Date(iv!.start).getHours()).toBe(9);
+        expect(iv!.end - iv!.start).toBe(3_600_000);
+      });
+    });
+
+    it('keeps the typed wall-clock time on a fall-back day', () => {
+      inParis(() => {
+        const iv = composeInterval({ year: 2026, month: 10, day: 25 }, 9 * 60, 10 * 60);
+        expect(new Date(iv!.start).getHours()).toBe(9);
+        expect(iv!.end - iv!.start).toBe(3_600_000);
+      });
+    });
+
+    it('rolls a night entry into a spring-forward day at the typed wall-clock end', () => {
+      inParis(() => {
+        // 23:00 on the eve to 04:00 on the transition day: 5 wall hours minus the skipped one.
+        const iv = composeInterval({ year: 2026, month: 3, day: 28 }, 23 * 60, 4 * 60);
+        expect(new Date(iv!.end).getDate()).toBe(29);
+        expect(new Date(iv!.end).getHours()).toBe(4);
+        expect(iv!.end - iv!.start).toBe(4 * 3_600_000);
+      });
+    });
+  });
 });
 
 describe('truncateReason', () => {
