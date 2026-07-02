@@ -170,6 +170,18 @@
     }
   }
 
+  // Editing a field makes a shown validation error stale and confusing: hide it until the next
+  // submit (the submit button state is left alone).
+  /** @param {HTMLElement} form @param {string} errorId */
+  function clearErrorOnEdit(form, errorId) {
+    const clear = () => {
+      const err = document.getElementById(errorId);
+      if (err) err.classList.add('tt-hidden');
+    };
+    form.addEventListener('input', clear);
+    form.addEventListener('change', clear);
+  }
+
   // Centered modal form inside the panel: all fields editable at once, with native date/time
   // pickers. Attached to <body> (not #app) so a background refresh that rebuilds #app leaves it open.
   function openAddForm() {
@@ -244,11 +256,13 @@
     wireModalDismiss(overlay, 'tt-f-cancel');
 
     const form = document.getElementById('tt-form');
-    if (form)
+    if (form) {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         submitAddForm();
       });
+      clearErrorOnEdit(form, 'tt-f-error');
+    }
     reasonSel.focus();
   }
 
@@ -326,11 +340,13 @@
     if (browse) browse.addEventListener('click', () => vscode.postMessage({ type: 'exportBrowse', path: pathInput ? pathInput.value : '' }));
 
     const form = document.getElementById('tt-x-form');
-    if (form)
+    if (form) {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         submitExportForm();
       });
+      clearErrorOnEdit(form, 'tt-x-error');
+    }
   }
 
   function submitExportForm() {
@@ -361,6 +377,9 @@
     else if (message.type === 'exportPath') {
       const pathInput = /** @type {HTMLInputElement} */ (document.getElementById('tt-x-path'));
       if (pathInput) pathInput.value = message.path;
+      // A programmatic fill fires no input event, so hide a stale empty-path error here too.
+      const err = document.getElementById('tt-x-error');
+      if (err) err.classList.add('tt-hidden');
     } else if (message.type === 'exportError') showExportError(message.message);
     else if (message.type === 'exportDone') closeModal();
   });
