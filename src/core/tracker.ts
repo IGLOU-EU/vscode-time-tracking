@@ -69,6 +69,14 @@ interface Keeper {
 
 const MIN_COUNTDOWN_SILENCE_MS = 60_000; // count as "working" within a minute of activity; only then count down
 
+/**
+ * How long a window must keep the focus before the gain means anything. Alt-tabbing through
+ * windows, or clicking the taskbar icon to reach another one, focuses each window it crosses:
+ * that is not a return to work and must not rearm the idle timer. The adapter holds scrolls back
+ * over the same delay, since a window that just took focus is still relaying out.
+ */
+export const FOCUS_SETTLE_MS = 5_000;
+
 export interface Tracker {
   recordActivity(at: number): void;
   setPresence(focused: boolean, at: number): void;
@@ -107,6 +115,7 @@ export function createTracker(config: TrackerConfig): Tracker {
   let lastActivityAt = Number.NEGATIVE_INFINITY;
   let openStart = 0;
   let lastActiveAt = 0;
+  let pendingFocusAt: number | null = null; // a focus gain waiting to prove it is not a pass-through
   let graceEnd = 0; // end of the provisionally-held out-grace, valid only while phase === 'grace'
   let countdownAnnounced = false;
   const listeners: Array<(iv: Interval) => void> = [];
@@ -141,6 +150,53 @@ export function createTracker(config: TrackerConfig): Tracker {
     }
   };
 
+  // Ending a session: a session too short to be work is a false start (a stray click, a window
+  // opened and closed, an action right before switching project) and is dropped whatever ended it,
+  // not just a hand pause. The floor judges the whole session, so a day boundary cutting a long
+  // one into a short leg is unaffected: that leg was already emitted by the split.
+  // Returns whether the time was kept.
+  const closeSession = (endAt: number, at: number): boolean => {
+    const ms = Math.max(0, endAt - openStart); // what would actually be recorded
+    if (ms < minSessionMs) {
+      for (const cb of discardListeners) cb({ ms, thresholdMs: minSessionMs, at });
+      return false;
+    }
+    closeOpen(endAt);
+    return true;
+  };
+
+  // A focus gain, once it has proven to be a real return. Entering the editor is a deliberate work
+  // transition: for an already-active session it resets the idle timer, so the new grace starts
+  // fresh (glancing at the editor for info keeps it alive, and thinking under focus does not eat
+  // into the inactivity grace once you leave for the DB/browser). From rest it only moves
+  // idle -> pending: a stray focus never starts counting, a real action confirms.
+  const applyFocusGain = (at: number): void => {
+    const wasFocused = windowFocused;
+    windowFocused = true;
+    countdownAnnounced = false; // the binding limit may have changed
+    if (manualPaused) return;
+    if (phase === 'grace') {
+      // A focus return disarms the idle timer and keeps the grace, leaving the session paused
+      // until a real action resumes it.
+      closeSession(graceEnd, at);
+      manualPaused = true;
+      phase = 'idle';
+      return;
+    }
+    if (phase === 'active') {
+      if (!wasFocused && at > lastActivityAt) lastActivityAt = at;
+    } else if (phase === 'idle') {
+      phase = 'pending';
+    }
+  };
+
+  const settleFocus = (now: number): void => {
+    if (pendingFocusAt === null || now - pendingFocusAt < FOCUS_SETTLE_MS) return;
+    const at = pendingFocusAt;
+    pendingFocusAt = null;
+    applyFocusGain(at);
+  };
+
   const startActive = (start: number, now: number): void => {
     openStart = start;
     lastActiveAt = now;
@@ -151,7 +207,7 @@ export function createTracker(config: TrackerConfig): Tracker {
   return {
     recordActivity(at) {
       if (phase === 'grace') {
-        closeOpen(graceEnd); // keep the provisional out-grace, the paused gap is not counted
+        closeSession(graceEnd, at); // keep the provisional out-grace, the paused gap is not counted
         if (at > lastActivityAt) lastActivityAt = at;
         manualPaused = false;
         startActive(at, at); // fresh session from the action
@@ -164,30 +220,34 @@ export function createTracker(config: TrackerConfig): Tracker {
       startActive(at, at); // a targeted action confirms the session (presence alone does not)
     },
     setPresence(focused, at) {
-      const wasFocused = windowFocused;
-      windowFocused = focused;
-      countdownAnnounced = false; // the binding limit may have changed
-      if (manualPaused) return;
-      // A focus change (entering OR leaving the editor) is a deliberate work transition. For an
-      // already-active session it resets the idle timer, so the new grace starts fresh: glancing
-      // at the editor for info keeps it alive, and time spent thinking under focus does not eat
-      // into the inactivity grace once you leave for the DB/browser. From rest, a stray focus is
-      // not enough to start counting: it only moves idle -> pending (a real action confirms).
-      if (phase === 'grace') {
-        // A focus return disarms the idle timer and keeps the grace, leaving the session paused
-        // until a real action resumes it. A stray unfocus just keeps holding.
-        if (focused) {
-          closeOpen(graceEnd);
-          manualPaused = true;
-          phase = 'idle';
-        }
+      if (focused) {
+        // Hold the gain until it proves itself (see FOCUS_SETTLE_MS). Only the awaiting display
+        // moves right away, because it counts nothing and must not lag behind the window.
+        if (pendingFocusAt === null) pendingFocusAt = at;
+        if (!manualPaused && phase === 'idle') phase = 'pending';
         return;
       }
+      if (pendingFocusAt !== null) {
+        const gainedAt = pendingFocusAt;
+        pendingFocusAt = null;
+        if (at - gainedAt < FOCUS_SETTLE_MS) {
+          // A pass-through: undo the display, leave every timer exactly as it was.
+          windowFocused = false;
+          if (!manualPaused && phase === 'pending') phase = 'idle';
+          return;
+        }
+        applyFocusGain(gainedAt); // it did last, so it counted after all, and is lost right below
+      }
+      const wasFocused = windowFocused;
+      windowFocused = false;
+      countdownAnnounced = false; // the binding limit may have changed
+      if (manualPaused) return;
+      if (phase === 'grace') return; // a stray unfocus just keeps holding
+      // Leaving the editor is a deliberate work transition too: it resets the idle timer, so the
+      // unfocused grace starts fresh from the moment focus was lost.
       if (phase === 'active') {
-        if (wasFocused !== focused && at > lastActivityAt) lastActivityAt = at;
-      } else if (focused && phase === 'idle') {
-        phase = 'pending';
-      } else if (!focused && phase === 'pending') {
+        if (wasFocused && at > lastActivityAt) lastActivityAt = at;
+      } else if (phase === 'pending') {
         phase = 'idle'; // left without acting: nothing counted
       }
     },
@@ -199,20 +259,18 @@ export function createTracker(config: TrackerConfig): Tracker {
     },
     pause(at) {
       if (phase === 'grace') {
-        closeOpen(graceEnd); // a hand pause during the grace keeps it, like a focus return
+        closeSession(graceEnd, at); // a hand pause during the grace keeps it, like a focus return
         manualPaused = true;
         phase = 'idle';
         return;
       }
-      // A session this short that the user stops by hand is noise, not work: discard it uncounted
-      // and go back to awaiting rather than paused.
-      if (phase === 'active' && at - openStart < minSessionMs) {
-        for (const cb of discardListeners) cb({ ms: at - openStart, thresholdMs: minSessionMs, at });
+      // A discarded false start goes back to awaiting rather than paused: there is nothing to
+      // resume, and a focused window is still a presence.
+      if (phase === 'active' && !closeSession(at, at)) {
         phase = windowFocused ? 'pending' : 'idle';
         return;
       }
       manualPaused = true;
-      if (phase === 'active') closeOpen(at);
       phase = 'idle';
     },
     resume() {
@@ -222,6 +280,7 @@ export function createTracker(config: TrackerConfig): Tracker {
       phase = 'idle';
     },
     tick(now) {
+      settleFocus(now); // a held focus gain that outlived the settle delay is a real return
       if (manualPaused) return;
 
       if (phase === 'active') {
@@ -240,14 +299,14 @@ export function createTracker(config: TrackerConfig): Tracker {
           // Safety caps close at the last real action (deducting the whole forgotten tail, which is
           // at least the cap); counted timeouts close at the last active tick (the grace counts).
           const closeAt = k.capped ? silenceSince() : lastActiveAt;
-          if (pauseListeners.length > 0) {
+          // A discarded false start reports nothing as a pause: no time was kept to explain.
+          if (closeSession(closeAt, now) && pauseListeners.length > 0) {
             const silentMs = now - silenceSince();
             const deductedMs = Math.max(0, lastActiveAt - closeAt);
             for (const cb of pauseListeners) {
               cb({ reason: k.reason, capped: k.capped, silentMs, thresholdMs: k.ms, deductedMs, at: now });
             }
           }
-          closeOpen(closeAt);
           phase = 'idle';
           return;
         }
@@ -274,14 +333,14 @@ export function createTracker(config: TrackerConfig): Tracker {
         if (now - silenceSince() > idleCapMs) {
           // The idle timer expired with no return: drop the provisional grace, keeping only up to
           // the last real action (the focus-cap deduction applied to the unfocused tail).
-          if (pauseListeners.length > 0) {
+          // closeSession excludes the dropped grace, and stays silent on a false start.
+          if (closeSession(silenceSince(), now) && pauseListeners.length > 0) {
             const deductedMs = Math.max(0, graceEnd - silenceSince());
             const silentMs = now - silenceSince();
             for (const cb of pauseListeners) {
               cb({ reason: 'focus-cap', capped: true, silentMs, thresholdMs: idleCapMs, deductedMs, at: now });
             }
           }
-          closeOpen(silenceSince()); // excludes the dropped grace
           phase = 'idle';
           return;
         }
@@ -297,11 +356,12 @@ export function createTracker(config: TrackerConfig): Tracker {
       if (continuous()) startActive(now, now);
     },
     flush(now) {
-      if (phase === 'active') closeOpen(now);
-      else if (phase === 'grace') closeOpen(graceEnd); // keep the provisional grace on a flush
+      if (phase === 'active') closeSession(now, now);
+      else if (phase === 'grace') closeSession(graceEnd, now); // keep the provisional grace on a flush
       // A flush closes the interval but does not end the user's presence, so a still-focused window
-      // returns to pending (awaiting confirmation), not idle.
-      phase = windowFocused ? 'pending' : 'idle';
+      // returns to pending (awaiting confirmation), not idle. A gain still settling counts as
+      // presence here: the window is focused, only its effect on the timers is on hold.
+      phase = windowFocused || pendingFocusAt !== null ? 'pending' : 'idle';
     },
     getPhase() {
       return manualPaused ? 'paused' : phase;

@@ -41,6 +41,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let exportSeparator = config.exportSeparator;
   let exportDateFormat = config.exportDateFormat;
   let defaultReason = config.defaultReason;
+  let minSessionMs = config.minSessionMs; // also applies to a session recovered from a crash marker
 
   const tracker: Tracker = createTracker({
     idleThresholdMs: config.idleThresholdMs,
@@ -64,6 +65,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let commitCounts: CommitCounts | undefined;
   let watcher: vscode.Disposable | undefined;
   let lastActivityTickAt = 0; // coalesces bursty activity (one keystroke fires 3 events)
+  let lastIgnoredLogAt = 0; // same coalescing for the dropped-signal log lines
   let lastTickAt = 0; // wall-clock of the last time we advanced the tracker, to spot a host suspend
 
   // Timesheet export flow, fed with the live project and settings.
@@ -149,7 +151,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     currentProjectId = id;
     currentFolder = folderUri;
     await storage.ensureDir(id);
-    await storage.recoverOrphanMarkers(id, Date.now(), RECOVERY_STALE_MS);
+    await storage.recoverOrphanMarkers(id, Date.now(), RECOVERY_STALE_MS, minSessionMs);
     watcher?.dispose();
     watcher = storage.watch(id, refreshHistory);
     refreshStatus(Date.now());
@@ -218,6 +220,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       advance(now);
       refreshStatus(now);
     },
+    // Nothing is tracked here: the line only makes a held-back phantom scroll explainable in the log.
+    onActivityIgnored: (now, kind) => {
+      if (now - lastIgnoredLogAt < 1000) return; // one relayout fires once per visible editor
+      lastIgnoredLogAt = now;
+      logger.log('ignored', { kind });
+    },
+    // A running session takes every scroll; only a scroll starting one has to be confirmed.
+    isSessionActive: () => tracker.getPhase(Date.now()) === 'active',
     onPresence: (focused, now) => {
       logger.log('presence', { focused });
       tracker.setPresence(focused, now);
@@ -303,6 +313,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       exportSeparator = cfg.exportSeparator;
       exportDateFormat = cfg.exportDateFormat;
       defaultReason = cfg.defaultReason;
+      minSessionMs = cfg.minSessionMs;
       logger.setEnabled(cfg.debugLogging);
       commitCounts?.clear(); // the configured email feeds the counts; git state won't signal its change
       refreshHistory();

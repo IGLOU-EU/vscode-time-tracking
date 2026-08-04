@@ -12,7 +12,13 @@
 // Editor interactions (edit/selection/scroll/navigation) only count while the window is focused: an
 // unfocused window cannot receive genuine input, so those events are spurious. Background work
 // (filesystem, tasks, terminal) is not gated, because it legitimately happens while unfocused.
+// Focus is not enough for a scroll that would START a session though: a focused window being
+// resized or moved between monitors re-emits its visible ranges, so a lone scroll waits for a
+// confirmation (see core/scroll-filter). Inside a running session every scroll counts.
 import * as vscode from 'vscode';
+
+import { createScrollFilter } from '../core/scroll-filter';
+import { FOCUS_SETTLE_MS } from '../core/tracker';
 
 export type ActivityKind =
   | 'edit'
@@ -30,10 +36,14 @@ export type ActivityKind =
 
 export interface SignalSinks {
   onActivity(now: number, kind: ActivityKind): void;
+  /** A scroll held back as unconfirmed, for the debug log only. Never tracked as work. */
+  onActivityIgnored(now: number, kind: ActivityKind): void;
   onPresence(focused: boolean, now: number): void;
   onDebugActive(active: boolean): void;
   onProcessRunning(running: boolean): void;
   onActiveFolder(folder: vscode.Uri | undefined): void;
+  /** Whether a session is already running, which is what the scroll confirmation hinges on. */
+  isSessionActive(): boolean;
 }
 
 function folderOf(uri: vscode.Uri | undefined): vscode.Uri | undefined {
@@ -45,13 +55,39 @@ function activeFolder(): vscode.Uri | undefined {
   return folderOf(vscode.window.activeTextEditor?.document.uri);
 }
 
+// A scroll gesture keeps firing, a relayout fires once. Scrolls under a second apart come from the
+// same relayout; past five seconds a scroll is on its own again and needs a new confirmation.
+const SCROLL_BURST_MS = 1_000;
+const SCROLL_CONFIRM_MS = 5_000;
+
 export function registerSignals(context: vscode.ExtensionContext, sinks: SignalSinks): void {
   const now = (): number => Date.now();
+  const scrollFilter = createScrollFilter({ burstMs: SCROLL_BURST_MS, confirmMs: SCROLL_CONFIRM_MS });
+  // Never accept a scroll from an unfocused window, whatever the event says: NEGATIVE_INFINITY
+  // stands for "not focused", so the settle test below fails on its own.
+  let focusedSince = vscode.window.state.focused ? now() : Number.NEGATIVE_INFINITY;
+  const focusSettled = (at: number): boolean => at - focusedSince >= FOCUS_SETTLE_MS;
+
+  // A scroll is the one signal the window can produce without anyone touching it, so it is the one
+  // signal that has to prove itself. A window that just took focus is still laying itself out, and
+  // crossing it on the way elsewhere is not work: nothing it scrolls in that moment counts. From
+  // rest, a lone scroll must also be confirmed, otherwise it would start counting time nobody
+  // worked. Inside a running session it is taken as it comes: a slow review read (scroll, think,
+  // scroll) cannot be told apart from a phantom, and dropping it would trim real work.
+  const acceptScroll = (at: number): boolean => {
+    if (!focusSettled(at)) return false;
+    return sinks.isSessionActive() || scrollFilter.accepts(at);
+  };
 
   // Editor events are only genuine while focused (see the file header). Otherwise they are spurious.
   const editorActivity = (kind: ActivityKind): void => {
     if (!vscode.window.state.focused) return;
-    sinks.onActivity(now(), kind);
+    const at = now();
+    if (kind === 'scroll' && !acceptScroll(at)) {
+      sinks.onActivityIgnored(at, kind);
+      return;
+    }
+    sinks.onActivity(at, kind);
   };
 
   // Real editing happens in on-disk files and untitled (unsaved) buffers. Every other scheme
@@ -61,7 +97,11 @@ export function registerSignals(context: vscode.ExtensionContext, sinks: SignalS
 
   // Foreground + edit/selection/scroll/navigation.
   context.subscriptions.push(
-    vscode.window.onDidChangeWindowState((state) => sinks.onPresence(state.focused, now())),
+    vscode.window.onDidChangeWindowState((state) => {
+      const at = now();
+      focusedSince = state.focused ? at : Number.NEGATIVE_INFINITY;
+      sinks.onPresence(state.focused, at);
+    }),
     vscode.workspace.onDidChangeTextDocument((e) => {
       const active = vscode.window.activeTextEditor;
       if (!active || e.document !== active.document) return; // ignore non-visible docs (logs, SCM)

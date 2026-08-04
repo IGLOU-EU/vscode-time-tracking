@@ -92,6 +92,66 @@ describe('focused thinking', () => {
   });
 });
 
+describe('passing over the window', () => {
+  // Alt-tabbing through windows, or clicking the taskbar icon to reach another one, gives each
+  // window it crosses a focus event. That is not a return to work: it must not rearm anything.
+  const PASS = 2000; // gone again two seconds later
+
+  it('a focus that does not last leaves the idle timer running', () => {
+    const { tracker } = setup();
+    tracker.recordActivity(T0);
+    tracker.setPresence(false, T0 + min(1)); // working elsewhere, the grace runs from here
+    tracker.tick(T0 + min(20));
+    tracker.setPresence(true, T0 + min(25)); // passing through on the way to another window
+    tracker.setPresence(false, T0 + min(25) + PASS);
+    tracker.tick(T0 + min(32)); // 31 min of silence since T0 + 1, past the 30 min threshold
+    expect(tracker.getPhase(T0 + min(32))).toBe('grace');
+  });
+
+  it('a focus that lasts rearms the idle timer', () => {
+    const { tracker } = setup();
+    tracker.recordActivity(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.setPresence(true, T0 + min(25)); // a real return to the editor
+    tracker.tick(T0 + min(25) + 6000); // still there six seconds later
+    tracker.tick(T0 + min(32)); // only 7 min of silence since the return
+    expect(tracker.getPhase(T0 + min(32))).toBe('active');
+  });
+
+  it('a focus lost just past the settle delay still counts', () => {
+    const { tracker } = setup();
+    tracker.recordActivity(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.setPresence(true, T0 + min(25));
+    tracker.setPresence(false, T0 + min(25) + 6000); // lost before any tick, but it did last
+    tracker.tick(T0 + min(32));
+    expect(tracker.getPhase(T0 + min(32))).toBe('active');
+  });
+
+  it('a focus that does not last leaves the provisional grace provisional', () => {
+    const { tracker, emitted } = setup();
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(32)); // -> grace
+    tracker.setPresence(true, T0 + min(35)); // passing through
+    tracker.setPresence(false, T0 + min(35) + PASS);
+    tracker.tick(T0 + min(36));
+    expect(tracker.getPhase(T0 + min(36))).toBe('grace'); // still counting down to the cap
+    expect(emitted).toEqual([]);
+  });
+
+  it('shows the awaiting state right away, then drops it if the focus does not last', () => {
+    // The display must not lag behind the window, even though nothing is counted yet.
+    const { tracker, emitted } = setup();
+    tracker.setPresence(true, T0);
+    expect(tracker.getPhase(T0)).toBe('pending');
+    tracker.setPresence(false, T0 + PASS);
+    expect(tracker.getPhase(T0 + PASS)).toBe('idle');
+    expect(emitted).toEqual([]);
+  });
+});
+
 describe('losing and regaining focus', () => {
   it('holds the out-grace as paused once the inactivity threshold passes', () => {
     const { tracker, emitted } = setup();
@@ -128,6 +188,7 @@ describe('losing and regaining focus', () => {
     tracker.setPresence(false, T0 + min(1));
     tracker.tick(T0 + min(32)); // -> grace
     tracker.setPresence(true, T0 + min(40)); // glance back, no real action
+    tracker.tick(T0 + min(40) + 6000); // the glance lasts, so it is a real return
     expect(emitted).toEqual([{ start: T0, end: T0 + min(31) }]); // grace kept
     expect(tracker.getPhase(T0 + min(40))).toBe('paused');
     tracker.recordActivity(T0 + min(42)); // a real action resumes
@@ -145,14 +206,14 @@ describe('losing and regaining focus', () => {
     tracker.onPaused((p) => pauses.push(p));
     tracker.recordActivity(T0);
     tracker.tick(T0);
-    tracker.setPresence(false, T0 + min(1));
-    tracker.tick(T0 + min(32)); // -> grace, silence measured from T0 + 1
-    tracker.tick(T0 + min(60)); // 59 min since leaving, still under the 60 cap
-    expect(tracker.getPhase(T0 + min(60))).toBe('grace');
-    tracker.tick(T0 + min(62)); // 61 min > 60 -> drop the grace
-    expect(emitted).toEqual([{ start: T0, end: T0 + min(1) }]); // only up to the focus leave
+    tracker.setPresence(false, T0 + min(5));
+    tracker.tick(T0 + min(36)); // -> grace, silence measured from T0 + 5
+    tracker.tick(T0 + min(64)); // 59 min since leaving, still under the 60 cap
+    expect(tracker.getPhase(T0 + min(64))).toBe('grace');
+    tracker.tick(T0 + min(66)); // 61 min > 60 -> drop the grace
+    expect(emitted).toEqual([{ start: T0, end: T0 + min(5) }]); // only up to the focus leave
     expect(pauses[0]).toMatchObject({ reason: 'focus-cap', capped: true, deductedMs: min(30) });
-    expect(tracker.getPhase(T0 + min(62))).toBe('idle');
+    expect(tracker.getPhase(T0 + min(66))).toBe('idle');
   });
 
   it('with the cap disabled, the grace is counted at the threshold (old behaviour)', () => {
@@ -295,6 +356,67 @@ describe('manual pause, resume, ignore', () => {
     tracker.pause(T0 + 1000);
     expect(emitted).toEqual([{ start: T0, end: T0 + 1000 }]);
     expect(tracker.getPhase(T0 + 1000)).toBe('paused');
+  });
+
+  it('discards a short session closed by a flush, whatever caused the flush', () => {
+    // A project switch, a host suspend or a shutdown right after a stray action: same false start.
+    const { tracker, emitted } = setup({ minSessionMs: min(2) });
+    const discarded: Array<{ ms: number; thresholdMs: number }> = [];
+    tracker.onSessionDiscarded((info) => discarded.push({ ms: info.ms, thresholdMs: info.thresholdMs }));
+    tracker.recordActivity(T0);
+    tracker.flush(T0 + min(1));
+    expect(emitted).toEqual([]);
+    expect(discarded).toEqual([{ ms: min(1), thresholdMs: min(2) }]);
+  });
+
+  it('keeps a session that reached the floor when it is flushed', () => {
+    const { tracker, emitted } = setup({ minSessionMs: min(2) });
+    tracker.recordActivity(T0);
+    tracker.flush(T0 + min(2));
+    expect(emitted).toEqual([{ start: T0, end: T0 + min(2) }]);
+  });
+
+  it('discards a short session closed by an inactivity timeout, reporting no pause', () => {
+    const { tracker, emitted } = setup({ idleThresholdMs: min(0.5), focusCapMs: 0, minSessionMs: min(2) });
+    const discarded: number[] = [];
+    const paused: PauseInfo[] = [];
+    tracker.onSessionDiscarded((info) => discarded.push(info.ms));
+    tracker.onPaused((info) => paused.push(info));
+    tracker.setPresence(false, T0);
+    tracker.recordActivity(T0);
+    tracker.tick(T0 + min(0.2));
+    tracker.tick(T0 + min(1)); // silence past the unfocused threshold
+    expect(emitted).toEqual([]);
+    expect(discarded).toEqual([min(0.2)]);
+    expect(paused).toEqual([]); // nothing was counted, so there is no pause to report
+  });
+
+  it('discards what a safety cap leaves behind when it falls under the floor', () => {
+    // The floor judges the time that would be recorded, not how long the session stayed open:
+    // an hour open with one minute of real work leaves a minute, which is still noise.
+    const { tracker, emitted } = setup({ minSessionMs: min(2) });
+    const discarded: number[] = [];
+    tracker.onSessionDiscarded((info) => discarded.push(info.ms));
+    tracker.recordActivity(T0);
+    tracker.tick(T0);
+    tracker.setPresence(false, T0 + min(1));
+    tracker.tick(T0 + min(32)); // -> grace
+    tracker.tick(T0 + min(62)); // cap reached with no return: the grace is dropped
+    expect(emitted).toEqual([]);
+    expect(discarded).toEqual([min(1)]);
+  });
+
+  it('keeps the short leg of a long session split at midnight', () => {
+    // The floor judges the session, not the piece a day boundary cuts out of it.
+    const { tracker, emitted } = setup({ minSessionMs: min(2) });
+    const start = 6 * DAY - min(1); // 23:59
+    tracker.recordActivity(start);
+    tracker.tick(start + min(30));
+    tracker.flush(start + min(30));
+    expect(emitted).toEqual([
+      { start, end: 6 * DAY },
+      { start: 6 * DAY, end: start + min(30) },
+    ]);
   });
 
   it('ignoreCurrentSession drops the open session without emitting', () => {

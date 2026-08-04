@@ -5,6 +5,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Crossing a window no longer rearms its timers. Alt-tabbing through windows, or clicking the
+  taskbar icon to reach another one, focuses every window on the way: a forgotten session used to
+  get its full safety cap back from that alone. A focus gain now has to last five seconds before
+  it counts, and a focus lost sooner is treated as if it never happened. The status bar still
+  shows "awaiting confirmation" right away, since it counts nothing.
+- A scroll never counts in the five seconds after a window takes focus, session running or not: a
+  window that just appeared is still laying itself out, and a scroll is the one signal it can
+  produce with nobody touching it. Typing, selecting and navigating still count immediately.
+
+### Fixed
+
+- The short-session threshold (`minSessionMinutes`, 1 min by default) now applies to every way a
+  session can end, not only to a hand pause. A false start that ended with a project switch, a
+  host suspend, a window closed, a timeout, a safety cap, or a crash recovery used to be written
+  as tracked time. The threshold judges the time that would be recorded, so a session held open
+  for an hour whose safety cap leaves one minute is discarded too, while a long session split at
+  local midnight keeps both of its legs.
+- A phantom scroll no longer starts a session. Resizing the window, plugging or unplugging a
+  monitor, or toggling a panel makes the editor report a scroll nobody performed, and a focused
+  window was enough for it to start counting. From rest, a scroll now starts a session only once
+  the gesture continues past a second; any other action still starts it right away. Inside a
+  running session every scroll counts as before, so reading line by line never gets trimmed. When
+  debug logging is on, a held-back scroll is written as an `ignored` line.
+
 ## [1.3.0] - 2026-07-03
 
 ### Added

@@ -93,11 +93,18 @@ without explicit human approval, even if a change looks cleaner:
   `docs/behavior-stories.md` if present):
   - **Targeted activity** = edits, selection, scroll, navigation, task start, and any workspace
     file write (so a plugin like Claude Code, a build, or a folder creation counts). It confirms a
-    session immediately, resets the idle timer, and resumes a manual pause.
+    session immediately, resets the idle timer, and resumes a manual pause. **A lone scroll is the
+    exception, and only from rest:** a relayout (window resize, monitor plugged in, panel toggled)
+    makes the editor re-emit its visible ranges, so a scroll starts a session only once a second
+    one confirms it (`src/core/scroll-filter.ts`). Inside a running session every scroll counts, as
+    a slow review read cannot be told apart from a phantom and losing it would trim real work. A
+    scroll never counts unfocused, nor within `FOCUS_SETTLE_MS` of a focus gain.
   - **Presence (window focus)** keeps an ALREADY-active session alive (a deliberate glance at the
     editor is work) and resets the idle timer on any focus change. From rest, focus alone does NOT
     count: it stays "pending" until a real action. The real mouse is not exposed by the API, so do
-    not design mouse-movement detection.
+    not design mouse-movement detection. **A focus gain must last `FOCUS_SETTLE_MS` (5 s) to count
+    at all:** crossing windows focuses each one on the way, and that must not rearm a forgotten
+    session's safety cap. Only the pending display moves immediately, as it counts nothing.
   - **While focused** the session never pauses on inactivity (thinking and reading count), bounded
     only by the focus safety cap. **Unfocused**, the inactivity grace runs from the moment focus
     was lost, but it is held PROVISIONALLY: past the threshold the session shows as paused and
@@ -110,6 +117,10 @@ without explicit human approval, even if a change looks cleaner:
     DEDUCTED: a forgotten session is closed at the last real action.
   - **Manual pause** is the status bar click (a toggle); it resumes on the next targeted activity
     or another click. Day boundary at local midnight.
+  - **False starts:** a session with less than `minSessionMinutes` to record is discarded however
+    it ends (hand pause, project switch, suspend, timeout, safety cap, crash recovery). The floor
+    judges the time that would be recorded, never the leg a midnight split cuts out of a long
+    session. Every close goes through the tracker's `closeSession`.
 - **VSCodium / Open VSX compatibility.** No proprietary dependency, no
   marketplace-only API, no CDN, everything bundled.
 - **TDD on the pure core.** Vitest, red-green-refactor. Aim for the bulk

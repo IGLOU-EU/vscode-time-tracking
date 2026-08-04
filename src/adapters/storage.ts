@@ -69,7 +69,9 @@ export class StorageAdapter {
 
   // Recover orphan markers left by a crashed window: commit their interval, then delete them.
   // Only markers from another window whose lastSeen is older than staleMs are considered orphans.
-  async recoverOrphanMarkers(projectId: string, now: number, staleMs: number): Promise<void> {
+  // A recovered session under minMs is a false start like any other and is dropped, so a crash
+  // cannot slip past the floor the tracker applies to every session it closes itself.
+  async recoverOrphanMarkers(projectId: string, now: number, staleMs: number, minMs = 0): Promise<void> {
     const dir = this.projectDir(projectId);
     for (const [name, type] of await this.list(dir)) {
       if (type !== vscode.FileType.File || !name.endsWith('.open.json')) continue;
@@ -77,7 +79,7 @@ export class StorageAdapter {
       const marker = await this.readJson<OpenMarker>(file);
       if (!marker || marker.windowId === this.windowId) continue;
       if (now - marker.lastSeen < staleMs) continue; // another live window, leave it alone
-      if (marker.end > marker.start) {
+      if (marker.end - marker.start >= Math.max(1, minMs)) {
         await this.appendInterval(projectId, { start: marker.start, end: marker.end });
       }
       try {
