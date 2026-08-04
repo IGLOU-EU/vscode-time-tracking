@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-04
+
 ### Changed
 
 - Crossing a window no longer rearms its timers. Alt-tabbing through windows, or clicking the
@@ -27,7 +29,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A phantom scroll no longer starts a session. Resizing the window, plugging or unplugging a
   monitor, or toggling a panel makes the editor report a scroll nobody performed, and a focused
   window was enough for it to start counting. From rest, a scroll now starts a session only once
-  the gesture continues past a second; any other action still starts it right away. Inside a
+  the gesture continues past a second. Any other action still starts it right away, and inside a
   running session every scroll counts as before, so reading line by line never gets trimmed. When
   debug logging is on, a held-back scroll is written as an `ignored` line.
 
