@@ -87,6 +87,13 @@ commits in the history, defaults to the repo `user.email`) and
 `timeTracking.debugLogging` (an output channel and log file for
 diagnosing behaviour).
 
+**Per-project settings.** Every setting can be overridden for a single
+project. Open the settings (`Ctrl+,`), switch to the **Workspace** tab,
+and edit the value there, or write it straight into the project's
+`.vscode/settings.json`. This matters most for
+`timeTracking.projectName` (the name written to exports) and
+`timeTracking.exportColumns` (when a client expects a given layout).
+
 ## Compatibility
 
 Works on VSCode and VSCodium. No proprietary dependency, no network
