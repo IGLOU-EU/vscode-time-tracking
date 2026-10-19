@@ -6,10 +6,7 @@ project, so you never have to remember to start a timer. The goal is to
 keep it small, strictly typed, well tested, and fully compatible with
 VSCodium (no proprietary dependency, no CDN).
 
-> **🤖 Using an AI or an agentic tool?** Read [`AGENTS.md`](AGENTS.md)
-> first. It contains the mandatory behaviour rules (full human review,
-> no auto-commits, commit co-signing, English-only, architecture
-> boundaries).
+> **🤖 Using an AI or an agentic tool?** Read [`AGENTS.md`](AGENTS.md) first. It adds the rules specific to AI assistants (full human review, no auto-commits, the LLM assistance declaration, architecture boundaries). Everything in this file applies to them too.
 
 ## Philosophy
 
@@ -33,6 +30,26 @@ VSCodium (no proprietary dependency, no CDN).
   `noFallthroughCasesInSwitch`. No `any`. Prefer `unknown` + a type
   guard, or a discriminated union.
 
+## One source of truth
+
+Every fact lives in exactly one place: a value, a computation, a rule, a documented behaviour. Everything else derives from it or links to it. A copy always ends up drifting from its original, so a duplicate is a defect to fix, in code as in docs.
+
+In code:
+
+- Setting defaults live in the `contributes.configuration` block of `package.json`. Code that reads a setting never repeats its default.
+- Durations are computed in `src/core/` only. Adapters and the webview display what the core returns and never recompute it.
+- The stored data is the raw JSONL intervals. Everything shown or exported (day totals, the multi-window union, sessions, charts) is derived from it at read time, and the History panel and the export consume the same derived sessions, so they match by construction.
+- The user's settings belong to the user. The extension reads them and never writes them back: a limit applies when the value is read.
+- A helper exists once. Share it from `src/core/` instead of copying it.
+- The version lives in `package.json`, bumped with `npm version`, which updates the lock file too. No other file hardcodes it.
+- The English strings are the source of every translation (see [Language](#language)).
+
+In docs:
+
+- A rule lives in one file and the others link to it. Conventions for everyone live here, rules specific to AI assistants in [`AGENTS.md`](AGENTS.md), behaviour as users see it in the [README](README.md), user-facing changes in the [changelog](CHANGELOG.md).
+- Link to the source of a technical fact (a version, a command, a default) instead of restating it.
+- A change that alters a documented behaviour updates the doc that owns it in the same commit.
+
 ## Dev environment
 
 ```bash
@@ -47,24 +64,22 @@ npm run compile           # type-check + esbuild bundle to dist/
 npm run test:integration  # smoke tests inside a real Extension Host
 ```
 
-Node ≥ 18.18 required. Press `F5` in VSCode/VSCodium to launch the
-Extension Development Host and try the extension live.
+Use the Node version required by `engines.node` in [`package.json`](package.json). Press `F5` in VSCode/VSCodium to launch the Extension Development Host and try the extension live.
 
 ## External documentation
 
-Anything touching the VSCode API must be backed by the authoritative
-docs, not training-data guesses. The API ships monthly and `since`
-versions matter for VSCodium compatibility.
+Anything touching the VSCode API must be backed by the authoritative docs, not training-data guesses. The API ships monthly and `since` versions matter for VSCodium compatibility. Cite the source in a comment when the choice is not obvious.
 
-- [Extension manifest](https://code.visualstudio.com/api/references/extension-manifest)
-  and [contribution points](https://code.visualstudio.com/api/references/contribution-points)
-- [vscode API reference](https://code.visualstudio.com/api/references/vscode-api)
-- [Webview guide](https://code.visualstudio.com/api/extension-guides/webview)
-- [Status bar UX](https://code.visualstudio.com/api/ux-guidelines/status-bar)
-- [Terminal shell integration](https://code.visualstudio.com/docs/terminal/shell-integration)
-- [Localisation (l10n)](https://github.com/microsoft/vscode-l10n)
-- [Git extension API](https://github.com/microsoft/vscode/blob/main/extensions/git/src/api/git.d.ts)
-- [Testing extensions](https://code.visualstudio.com/api/working-with-extensions/testing-extension)
+| What you're touching | Where to look first |
+| --- | --- |
+| Extension manifest, contribution points | <https://code.visualstudio.com/api/references/extension-manifest> + <https://code.visualstudio.com/api/references/contribution-points> |
+| Any `vscode` namespace API | <https://code.visualstudio.com/api/references/vscode-api> + `vscode.d.ts` |
+| Webview / webview view | <https://code.visualstudio.com/api/extension-guides/webview> |
+| Status bar | <https://code.visualstudio.com/api/ux-guidelines/status-bar> |
+| Terminal shell integration (1.93+) | <https://code.visualstudio.com/docs/terminal/shell-integration> |
+| Localisation (l10n) | <https://code.visualstudio.com/api/references/vscode-api#l10n> + <https://github.com/microsoft/vscode-l10n> |
+| Git extension API | <https://github.com/microsoft/vscode/blob/main/extensions/git/src/api/git.d.ts> |
+| Testing | <https://code.visualstudio.com/api/working-with-extensions/testing-extension> |
 
 ## Code conventions
 
@@ -76,6 +91,13 @@ files keep their target language as their value:
 to the English source first (`package.nls.json` or a `vscode.l10n.t`
 literal), then propagate the translation.
 
+The status bar keywords `idle` and `out` are deliberately left untranslated.
+
+### Vocabulary
+
+- Tracked time is **counted** or **not counted**, and a safety cap **deducts** an idle tail. The extension measures time and has no commercial purpose: never describe it in terms of charging anyone. This holds everywhere, from the UI to the docs, the code, the tests and the commit messages.
+- The timesheet export stays generic. Never name a target application in code, settings, examples or docs.
+
 ### Style
 
 - Files in `kebab-case.ts`. Named exports only, no `default export`, so
@@ -85,19 +107,34 @@ literal), then propagate the translation.
 - Early return over nested conditionals.
 - One responsibility per file. If a module grows past ~250 lines,
   consider a split.
-- Comments describe the **why**, not the **what**. File-header comments
-  summarise the module's responsibility in one to three lines.
+- Comments describe the **why**, not the **what**: the reason or the constraint behind a choice, a subtle invariant, a `since` version or a VSCode issue. They never narrate the code, nor the discussion that led to a change. File-header comments summarise the module's responsibility in one to three lines.
+- Prose in comments and docs uses no em-dash and no semicolon.
+
+### Design rules
+
+These come from fixed bugs. Keep them so the bugs stay fixed.
+
+- Provisional time (the session still running) never goes into a permanent file such as an export. Only closed time is written.
+- Never cache a failure. Only an authoritative result, an authoritative zero included, may be cached.
 
 ### Tests
 
 - Every new pure function ships with a matching Vitest suite next to it
   (`src/core/<module>.test.ts`).
+- A bug fix ships with a test that fails without it: a core test when the logic is pure, an integration test under `src/test/` otherwise.
 - Integration smoke tests (activation, commands, status bar, webview)
   go under `src/test/` and run through `@vscode/test-cli` against a real
   Extension Host.
 - Test names in English, one scenario per test.
 - The pure core must be deterministic: inject the clock (`now`) and the
   timezone (`midnightOf`), never read them directly in `src/core/`.
+
+### Commit messages
+
+- [Conventional Commits](https://www.conventionalcommits.org/): `type(optional scope): subject`, in lowercase, with no trailing period and 80 characters at most. Usual types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `style`, `chore`, `ci`, `build`.
+- Sign off every commit (`git commit -s`).
+- The gitmoji that starts each subject in the history is added by the maintainer's commit hook. Do not type it.
+- A commit an LLM took part in carries the trailer set in [AGENTS.md](AGENTS.md#3-declare-llm-assistance).
 
 ## Contribution cycle
 
@@ -110,7 +147,7 @@ literal), then propagate the translation.
 5. If you want to change architecture (the three-layer split, the
    storage model, the activity model), **open an issue to discuss
    first**, no surprise merge requests.
-6. Update the README and related docs in the same commit.
+6. In the same commit, update the doc that owns any behaviour you changed: the README for what users see, the changelog under `Unreleased`, `AGENTS.md` §5 for the activity model.
 7. Open a merge request with a description focused on **why**.
 
 ## License

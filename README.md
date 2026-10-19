@@ -48,6 +48,8 @@ stepping away).
   calendar heatmap (hover a day for its hours and commit count), your git
   commits per day, monthly totals with variation, and a per-window
   breakdown.
+- Manual time entries: add time by hand from the History panel, with a reason picked from your presets or typed freely.
+- Timesheet export: export a month to CSV from the History panel, one row per session or per day, with your own columns, separator and date format.
 - Data stored locally only.
 
 ## How tracking and pausing work
@@ -119,18 +121,7 @@ available; older clients degrade gracefully.
 
 ## Development
 
-See `docs/vscode-extension-dev.md` (local) for the full guide, and
-[CONTRIBUTING.md](CONTRIBUTING.md) for conventions. AI assistants must
-read [AGENTS.md](AGENTS.md) first.
-
-```bash
-npm install
-npm run test:unit:watch   # TDD loop on the pure core
-npm run check-types       # tsc --noEmit
-npm run lint              # eslint
-npm run compile           # type-check + bundle
-npm run test:integration  # smoke tests in an Extension Host
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev environment and the conventions. AI assistants must read [AGENTS.md](AGENTS.md) first.
 
 ## License
 

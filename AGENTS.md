@@ -5,6 +5,8 @@ tools (Claude Code, Cursor, OpenAI Codex, Aider, Windsurf, …) following
 the [agents.md](https://agents.md/) convention. Human contributors
 should read [`CONTRIBUTING.md`](CONTRIBUTING.md) instead.
 
+Everything in `CONTRIBUTING.md` applies to you too: the one-source-of-truth rule, the code style, language, vocabulary, design rules, tests, commit messages and local checks. This file only adds the rules specific to AI assistants, and it does not repeat the conventions.
+
 If you are an AI assistant working on this repository, treat the rules
 below as **mandatory boundaries**, not suggestions. They exist because
 the project owner has explicit preferences about how AI participates in
@@ -60,11 +62,7 @@ responsibility is always human.
 
 ### 4. English everywhere in the repo
 
-**All code, comments, and committed documentation must be in English.**
-The only exception is the localisation files that hold a target language
-as their value: `package.nls.fr.json` and `l10n/bundle.l10n.fr.json`.
-The English source strings (`package.nls.json`, the literals passed to
-`vscode.l10n.t(...)`) are the source of truth.
+The [Language](CONTRIBUTING.md#language) rule of `CONTRIBUTING.md` is a hard rule for you, not a preference, whatever language the owner uses in the conversation.
 
 ### 5. Don't change architecture without asking
 
@@ -136,56 +134,22 @@ do you think?" Never refactor first and ask forgiveness later.
 
 Do not guess API shapes from training data — VSCode ships monthly and
 `since` versions matter for VSCodium compatibility. Consult the
-authoritative source and cite it in a comment when non-obvious.
+authoritative source listed in [External documentation](CONTRIBUTING.md#external-documentation) and cite it in a comment when non-obvious.
 
-| What you're touching | Where to look first |
-|---|---|
-| Extension manifest, contribution points | <https://code.visualstudio.com/api/references/extension-manifest> + <https://code.visualstudio.com/api/references/contribution-points> |
-| Any `vscode` namespace API | <https://code.visualstudio.com/api/references/vscode-api> + `vscode.d.ts` |
-| Webview / webview view | <https://code.visualstudio.com/api/extension-guides/webview> |
-| Status bar | <https://code.visualstudio.com/api/ux-guidelines/status-bar> |
-| Terminal shell integration (1.93+) | <https://code.visualstudio.com/docs/terminal/shell-integration> |
-| Localisation (l10n) | <https://code.visualstudio.com/api/references/vscode-api#l10n> + <https://github.com/microsoft/vscode-l10n> |
-| Git extension API | <https://github.com/microsoft/vscode/blob/main/extensions/git/src/api/git.d.ts> |
-| Testing | <https://code.visualstudio.com/api/working-with-extensions/testing-extension> |
+### 7. Never add a duplicate
 
-A fuller, project-specific development guide lives at
-`docs/vscode-extension-dev.md` — **note it is not committed** (it is
-local to the owner's machine). If you have it, read it before working
-on extension code. If you don't, fall back to the sources above and ask
-the owner.
+Apply [One source of truth](CONTRIBUTING.md#one-source-of-truth) strictly. Never repeat a default, copy a helper, restate a rule in a second file, or retype a fact that has a source. Link to it or derive from it. When you find an existing duplicate, point it out to the owner.
 
 ## Soft expectations (good practice)
 
 ### Don't break the pipeline
 
-These must succeed before you propose changes for review:
-
-```bash
-npm run check-types   # tsc --noEmit, must be silent
-npm run lint          # eslint, no errors
-npm run test:unit     # Vitest on the pure core, 100% pass
-npm run compile       # esbuild bundle (once src/extension.ts exists)
-```
-
-If something was failing before your change, say so; don't silently
-disable a test or a lint rule.
+The local checks of the [contribution cycle](CONTRIBUTING.md#contribution-cycle) must pass before you propose changes for review. If something was failing before your change, say so. Never silently disable a test or a lint rule.
 
 ### Don't expand scope without permission
 
 Fix what you were asked to fix. Don't reformat unrelated files or
 refactor neighbouring code "while you're here".
-
-### Test pure code
-
-Any new pure function (no `vscode`, no I/O) ships with its Vitest suite
-next to it (`*.test.ts` under `src/core/`). One test per scenario, test
-names in English.
-
-### Comments explain the *why*
-
-Historical context, subtle invariants, references to a `since` version
-or a VSCode issue. Trivial restatement of the code is unwelcome.
 
 ### Don't invent file names
 
