@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Tooling
+
+- The CI builds the extension bundle on every push, as the local checks already require.
+
 ## [1.3.1] - 2026-08-04
 
 ### Changed

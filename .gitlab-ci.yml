@@ -1,6 +1,7 @@
 # CI for the Time Tracking extension.
 #
-# On every push to main and on merge requests, run the quality gate (types, lint, unit tests).
+# On every push to main and on merge requests, run the same quality gate as the local checks
+# (types and bundle, lint, unit tests).
 # On a version tag (e.g. 0.1.0 or v0.1.0), additionally build time-tracking-<tag>.vsix and publish
 # it to Open VSX.
 #
@@ -28,7 +29,7 @@ test:
   stage: test
   script:
     - npm ci
-    - npm run check-types
+    - npm run compile
     - npm run lint
     - npm run test:unit
   rules:
