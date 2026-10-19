@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Tooling
 
 - The CI builds the extension bundle on every push, as the local checks already require.
+- The editor API types are pinned to the minimum supported VSCode version, so a call to a newer API fails the type check instead of breaking on older editors.
 
 ## [1.3.1] - 2026-08-04
 

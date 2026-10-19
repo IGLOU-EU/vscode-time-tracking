@@ -266,7 +266,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@types/vscode": "^1.93.0",
+    "@types/vscode": "~1.93.0",
     "@types/node": "^20.19.0",
     "@types/mocha": "^10.0.6",
     "typescript": "^5.5.4",
