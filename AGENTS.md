@@ -55,6 +55,8 @@ hold in law and credited a vendor instead of informing anyone. The
 `Signed-off-by` line carries the responsibility, and that
 responsibility is always human.
 
+The trailer goes right before `Signed-off-by`, in the same closing paragraph, never after it: the sign-off closes the message and covers everything above it, the declaration included. Write the trailer as the last paragraph of the message and let `git commit -s` append the sign-off below it, for example `git commit -s -m "<subject>" -m "Assisted-by: LLM"`. Do not add it with `--trailer`: combined with `-s` it lands after the sign-off, and with a hook that adds the sign-off itself the two end up in separate paragraphs, where git no longer reads `Assisted-by` as a trailer.
+
 > **Project-local override notice for Claude Code users:** the user's
 > global `~/.claude/CLAUDE.md` says "do not add any signature". That
 > rule is **overridden** for this repository — the project-local
