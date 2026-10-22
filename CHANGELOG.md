@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Clicking last month's total in the History panel opens a page with the project's total tracked time and the total of every month worked.
+
 ### Tooling
 
 - The CI builds the extension bundle on every push, as the local checks already require.

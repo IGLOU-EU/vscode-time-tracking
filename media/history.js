@@ -11,6 +11,10 @@
   // preset reasons without another round trip to the host.
   let lastStrings = /** @type {Record<string, string>} */ ({});
   let lastReasons = /** @type {string[]} */ ([]);
+  // The months page replaces the main view until Back. The last history payload is kept so Back
+  // redraws the main view without a round trip.
+  let lastHistory = /** @type {any} */ (null);
+  let monthsShown = false;
 
   // Quotes included: esc() also feeds double-quoted attribute values (option/input `value="..."`),
   // where an unescaped quote would truncate the value and inject stray attributes.
@@ -48,14 +52,16 @@
     const m = payload.months || {};
     const days = Array.isArray(payload.days) ? payload.days : [];
 
-    // Last month first, then this month (side by side when the panel is wide enough).
+    // Last month first, then this month (side by side when the panel is wide enough). The last
+    // month badge opens the months page, as a focusable button so the keyboard reaches it too.
     const lastMonthCard =
-      `<div class="tt-badge">` +
+      `<div id="tt-months" class="tt-badge tt-badge-link" role="button" tabindex="0" title="${esc(s.allMonths || 'Show all months')}">` +
       `<div class="tt-badge-label">${esc(s.lastMonth || 'Last month')}</div>` +
       `<div class="tt-badge-value">${esc(m.previousLabel || '0m')}</div>` +
       (m.variationText
         ? `<div class="tt-delta tt-${esc(m.variationDir || 'na')}">${esc(m.variationText)}</div>`
         : '') +
+      `<i class="codicon codicon-search" aria-hidden="true"></i>` +
       `</div>`;
     const thisMonthCard =
       `<div class="tt-badge">` +
@@ -119,10 +125,49 @@
     if (exportBtn) exportBtn.addEventListener('click', () => vscode.postMessage({ type: 'openExport' }));
     const settings = document.getElementById('tt-settings');
     if (settings) settings.addEventListener('click', () => vscode.postMessage({ type: 'openSettings' }));
+    const months = document.getElementById('tt-months');
+    if (months) {
+      months.addEventListener('click', () => vscode.postMessage({ type: 'openMonths' }));
+      months.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        vscode.postMessage({ type: 'openMonths' });
+      });
+    }
     // Click a day with several sessions to expand its full breakdown (toggle the ellipsis off).
     app.querySelectorAll('.tt-clickable').forEach((li) =>
       li.addEventListener('click', () => li.classList.toggle('tt-expanded')),
     );
+  }
+
+  /** @param {{ totalLabel?: string, months?: Array<{ label?: string, hoursLabel?: string }> }} payload */
+  function renderMonths(payload) {
+    const s = lastStrings;
+    const months = Array.isArray(payload.months) ? payload.months : [];
+    /** @param {string} label @param {string} value */
+    const card = (label, value) =>
+      `<div class="tt-badge">` +
+      `<div class="tt-badge-label">${esc(label)}</div>` +
+      `<div class="tt-badge-value">${esc(value)}</div>` +
+      `</div>`;
+
+    app.innerHTML =
+      `<div class="tt-header">` +
+      `<h1>${esc(s.months || 'Months')}</h1>` +
+      `<div class="tt-actions">` +
+      `<button id="tt-back" title="${esc(s.back || 'Back')}"><i class="codicon codicon-arrow-left"></i></button>` +
+      `</div>` +
+      `</div>` +
+      `<div class="tt-badges">${card(s.total || 'Total', payload.totalLabel || '0m')}</div>` +
+      `<div class="tt-badges">${months.map((m) => card(m.label || '', m.hoursLabel || '0m')).join('')}</div>`;
+
+    const back = document.getElementById('tt-back');
+    if (back) {
+      back.addEventListener('click', () => {
+        monthsShown = false;
+        if (lastHistory) render(lastHistory);
+      });
+    }
   }
 
   // Sentinel value of the "Other…" option, kept apart from any real reason.
@@ -384,8 +429,15 @@
   window.addEventListener('message', (event) => {
     const message = event.data;
     if (!message) return;
-    if (message.type === 'history') render(message.payload);
-    else if (message.type === 'entryError') showFormError(message.message);
+    if (message.type === 'history') {
+      lastHistory = message.payload;
+      // While the months page is shown, refresh it rather than replacing it with the main view.
+      if (monthsShown) vscode.postMessage({ type: 'openMonths' });
+      else render(message.payload);
+    } else if (message.type === 'months') {
+      monthsShown = true;
+      renderMonths(message.payload);
+    } else if (message.type === 'entryError') showFormError(message.message);
     else if (message.type === 'entrySaved') closeModal();
     else if (message.type === 'exportOpen') openExportForm(message);
     else if (message.type === 'exportPath') {

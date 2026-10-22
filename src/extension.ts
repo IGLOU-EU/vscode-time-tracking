@@ -7,7 +7,7 @@ import { createTracker, type Tracker } from './core/tracker';
 import { buildHistoryModel, historyWindowStartMs } from './core/history';
 import { formatClock, hoursMinutes, clockTime } from './core/activity';
 import { projectIdFromFsPath } from './core/project';
-import { dayKeyLocal } from './core/aggregate';
+import { aggregateByDay, buildMonthsOverview, dayKeyLocal } from './core/aggregate';
 
 import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
@@ -15,8 +15,8 @@ import { StorageAdapter } from './adapters/storage';
 import { registerSignals } from './adapters/signals';
 import { getGitApi, CommitCounts } from './adapters/git';
 import { HistoryViewProvider, type HistoryPayload, type HistoryDataPort } from './adapters/history-view';
-import type { ManualEntryInput } from './adapters/history-view';
-import { createExportFlow } from './adapters/export';
+import type { ManualEntryInput, MonthsPayload } from './adapters/history-view';
+import { createExportFlow, monthLabel } from './adapters/export';
 import { parseYmd, parseHhMm, composeInterval, normalizeReason } from './core/manual-entry';
 import { createLogger } from './adapters/logger';
 
@@ -84,6 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // History data port: the pure model, formatted with localized labels, plus the manual-entry flow.
   const dataPort: HistoryDataPort = {
     buildPayload: () => buildPayload(),
+    buildMonths: () => buildMonths(),
     submitManualEntry: (input) => submitManualEntry(input),
     getExportOpen: exportFlow.getExportOpen,
     browseExportPath: exportFlow.browseExportPath,
@@ -441,6 +442,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     };
   }
 
+  // The months page reads the whole history, so it is built only when the page asks for it: the
+  // panel itself stays bounded to its rendered window.
+  async function buildMonths(): Promise<MonthsPayload> {
+    if (!currentProjectId) return { totalLabel: formatClock(0), months: [] };
+    const now = new Date();
+    const perDay = aggregateByDay(await storage.readAllTagged(currentProjectId));
+    const overview = buildMonthsOverview(perDay, now.getFullYear(), now.getMonth());
+    return {
+      totalLabel: formatClock(overview.totalMs),
+      months: overview.months.map((m) => ({ label: monthLabel(m.month), hoursLabel: formatClock(m.ms) })),
+    };
+  }
+
   // Initial project + crash recovery + git, then first render.
   const initialFolder = activeFolderUri();
   if (initialFolder) await setProject(initialFolder);
@@ -506,6 +520,10 @@ function historyStrings(): Record<string, string> {
     exportEmpty: vscode.l10n.t('No data to export yet.'),
     thisMonth: vscode.l10n.t('This month'),
     lastMonth: vscode.l10n.t('Last month'),
+    total: vscode.l10n.t('Total'),
+    months: vscode.l10n.t('Months'),
+    allMonths: vscode.l10n.t('Show all months'),
+    back: vscode.l10n.t('Back'),
     commitsShort: vscode.l10n.t('commits'),
     session: vscode.l10n.t('Session'),
     trend: vscode.l10n.t('Trend'),

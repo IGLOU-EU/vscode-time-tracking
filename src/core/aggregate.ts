@@ -97,3 +97,34 @@ export function buildMonthlyBadges(
     previousVariationPct: percentVariation(previousMs, beforePreviousMs),
   };
 }
+
+export interface MonthTotal {
+  /** Month key, YYYYMM format. */
+  readonly month: string;
+  readonly ms: number;
+}
+
+export interface MonthsOverview {
+  /** Whole-history total (ms). */
+  readonly totalMs: number;
+  /** Every month with tracked time, plus last month even at zero, newest first. */
+  readonly months: MonthTotal[];
+}
+
+/**
+ * Builds the months page: the whole-history total and one total per month with tracked time,
+ * newest first. Last month is always listed, even at zero, since its badge opens the page.
+ */
+export function buildMonthsOverview(perDay: readonly DayTotal[], refYear: number, refMonth0: number): MonthsOverview {
+  const byMonth = new Map<string, number>([[monthKey(refYear, refMonth0 - 1), 0]]);
+  for (const d of perDay) {
+    const key = d.date.slice(0, 6);
+    byMonth.set(key, (byMonth.get(key) ?? 0) + d.ms);
+  }
+  return {
+    totalMs: perDay.reduce((sum, d) => sum + d.ms, 0),
+    months: [...byMonth]
+      .map(([month, ms]) => ({ month, ms }))
+      .sort((a, b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : 0)),
+  };
+}

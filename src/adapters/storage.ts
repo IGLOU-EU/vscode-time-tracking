@@ -111,8 +111,13 @@ export class StorageAdapter {
       const file = vscode.Uri.joinPath(dir, name);
       if (name.endsWith('.jsonl')) {
         const plan = planDataFile(name, today, minDay);
-        if (plan === 'skip') continue; // older than the rendered window
         const key = `${projectId}/${name}`;
+        if (plan === 'skip') {
+          // Older than the rendered window but still on disk: keep its parsed copy for the next
+          // full read (the months page) instead of evicting it below.
+          seen.add(key);
+          continue;
+        }
         const settled = plan === 'cacheable';
         if (settled) {
           seen.add(key);

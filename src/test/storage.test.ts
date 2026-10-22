@@ -123,6 +123,24 @@ suite('StorageAdapter (real fs)', () => {
     assert.strictEqual(read[0].start, recent);
   });
 
+  test('keeps a skipped file cached for the next full read (months page after a panel refresh)', async () => {
+    const a = makeAdapter('w1');
+    await a.ensureDir(PROJECT);
+    const old = daysAgo(200);
+    await a.appendInterval(PROJECT, { start: old, end: old + HOUR });
+    assert.strictEqual((await a.readAllTagged(PROJECT)).length, 1); // full read: parses and caches the file
+    await a.readAllTagged(PROJECT, { sinceMs: daysAgo(100) }); // windowed read: skips it
+
+    // Append straight to disk, so only a re-parse would see the new line.
+    await fsp.appendFile(
+      fileFor(old, 'w1'),
+      serializeLine(toStoredInterval('w1', { start: old + 2 * HOUR, end: old + 3 * HOUR })),
+    );
+
+    // The skip did not evict the file: the next full read is a cache hit.
+    assert.strictEqual((await a.readAllTagged(PROJECT)).length, 1);
+  });
+
   test('keeps the day just before the window start (one-day slack), drops the one before that', async () => {
     const a = makeAdapter('w1');
     await a.ensureDir(PROJECT);

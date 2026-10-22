@@ -4,6 +4,7 @@ import {
   aggregateByDay,
   percentVariation,
   buildMonthlyBadges,
+  buildMonthsOverview,
   type DayTotal,
 } from './aggregate';
 import type { Interval } from './intervals';
@@ -95,5 +96,46 @@ describe('buildMonthlyBadges', () => {
     const badges = buildMonthlyBadges(data, 2026, 0); // January 2026
     expect(badges.currentMs).toBe(h(2));
     expect(badges.previousMs).toBe(h(4));
+  });
+});
+
+describe('buildMonthsOverview', () => {
+  it('totals the whole history', () => {
+    const data: DayTotal[] = [
+      { date: '20250110', ms: h(2) },
+      { date: '20260616', ms: h(3) },
+    ];
+    expect(buildMonthsOverview(data, 2026, 5).totalMs).toBe(h(5));
+  });
+
+  it('lists each month with tracked time, newest first, skipping empty months', () => {
+    const data: DayTotal[] = [
+      { date: '20260110', ms: h(2) }, // January: 3h in total
+      { date: '20260112', ms: h(1) },
+      { date: '20260520', ms: h(4) }, // May (last month)
+      { date: '20260616', ms: h(6) }, // June (current month)
+    ];
+    expect(buildMonthsOverview(data, 2026, 5).months).toEqual([
+      { month: '202606', ms: h(6) },
+      { month: '202605', ms: h(4) },
+      { month: '202601', ms: h(3) },
+    ]);
+  });
+
+  it('lists last month even when it has no tracked time', () => {
+    const data: DayTotal[] = [{ date: '20260616', ms: h(2) }];
+    expect(buildMonthsOverview(data, 2026, 5).months).toEqual([
+      { month: '202606', ms: h(2) },
+      { month: '202605', ms: 0 },
+    ]);
+  });
+
+  it('leaves out the current month while it has no tracked time', () => {
+    const data: DayTotal[] = [{ date: '20260520', ms: h(4) }];
+    expect(buildMonthsOverview(data, 2026, 5).months).toEqual([{ month: '202605', ms: h(4) }]);
+  });
+
+  it('finds last month across the year rollover (January -> previous December)', () => {
+    expect(buildMonthsOverview([], 2026, 0)).toEqual({ totalMs: 0, months: [{ month: '202512', ms: 0 }] });
   });
 });

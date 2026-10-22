@@ -26,6 +26,12 @@ export interface HistoryPayload {
   fontSizePx: number; // base font size for the panel in px. 0 = follow the editor font size
 }
 
+/** The months page opened from the last month badge: the project total, then one card per month. */
+export interface MonthsPayload {
+  totalLabel: string;
+  months: Array<{ label: string; hoursLabel: string }>;
+}
+
 /** Raw field values from the add-time form, validated by the core on the host side. */
 export interface ManualEntryInput {
   reason: string;
@@ -57,6 +63,8 @@ export interface ExportRequest {
 
 export interface HistoryDataPort {
   buildPayload(): Promise<HistoryPayload>;
+  /** Totals over the whole history, read only when the months page asks for them. */
+  buildMonths(): Promise<MonthsPayload>;
   /** Validate and store a manual entry. Returns a localized error message, or null on success. */
   submitManualEntry(input: ManualEntryInput): Promise<string | null>;
   /** Gather the months with data and a default output path for the export modal. */
@@ -68,7 +76,7 @@ export interface HistoryDataPort {
 }
 
 type InboundMessage =
-  | { type: 'ready' | 'refresh' | 'openSettings' | 'openExport' }
+  | { type: 'ready' | 'refresh' | 'openSettings' | 'openExport' | 'openMonths' }
   | ({ type: 'submitEntry' } & ManualEntryInput)
   | { type: 'exportBrowse'; path: string }
   | ({ type: 'exportRun' } & ExportRequest);
@@ -122,6 +130,18 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
           .catch((e: unknown) => {
             // The modal only opens on the reply, so a silent rejection would make the click do nothing.
             void vscode.window.showErrorMessage(vscode.l10n.t('Could not open the export form: {error}', { error: errorText(e) }));
+          });
+        return;
+      }
+      if (msg.type === 'openMonths') {
+        void this.data
+          .buildMonths()
+          .then((payload) => {
+            void this.view?.webview.postMessage({ type: 'months', payload });
+          })
+          .catch((e: unknown) => {
+            // The page only opens on the reply, so a silent rejection would make the click do nothing.
+            void vscode.window.showErrorMessage(vscode.l10n.t('Could not load the months: {error}', { error: errorText(e) }));
           });
         return;
       }

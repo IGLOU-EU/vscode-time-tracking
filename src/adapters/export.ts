@@ -35,6 +35,12 @@ export interface ExportFlow {
 // setting).
 const LAST_FOLDER_KEY = 'export.lastFolder';
 
+/** Localized month and year of a YYYYMM key, e.g. "July 2026", shared with the months page. */
+export function monthLabel(value: string): string {
+  const date = new Date(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, 1);
+  return new Intl.DateTimeFormat(vscode.env.language, { month: 'long', year: 'numeric' }).format(date);
+}
+
 export function createExportFlow(
   storage: StorageAdapter,
   workspaceState: vscode.Memento,
@@ -47,11 +53,6 @@ export function createExportFlow(
     // No open markers: the export is a permanent snapshot, so it only carries committed time (the
     // in-progress session may still be re-cut or discarded as below the minimum session length).
     return buildDays(await storage.readAllTagged(projectId, { includeOpen: false }), {});
-  }
-
-  function monthLabel(value: string): string {
-    const date = new Date(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, 1);
-    return new Intl.DateTimeFormat(vscode.env.language, { month: 'long', year: 'numeric' }).format(date);
   }
 
   function defaultExportFileName(value: string): string {

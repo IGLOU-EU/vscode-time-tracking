@@ -92,6 +92,25 @@ body {
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
 }
 
+/* The last month badge opens the months page. A small magnifier in its corner tells it does. */
+.tt-badge-link {
+  position: relative;
+  cursor: pointer;
+}
+
+.tt-badge-link .codicon {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-size: var(--tt-fs-small);
+  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+}
+
+.tt-badge-link:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
 .tt-badge-label {
   font-size: var(--tt-fs-small);
   color: var(--vscode-descriptionForeground, var(--vscode-foreground));
