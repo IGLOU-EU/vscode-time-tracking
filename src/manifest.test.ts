@@ -1,5 +1,6 @@
 // The manifest and the README cannot import code, so the facts they repeat are held here.
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { NUMBER_BOUNDS, normalizeSettings, type SettingReader } from './core/settings';
 import { EXPORT_DATE_FORMATS } from './core/timesheet';
@@ -75,6 +76,19 @@ describe('integration suite', () => {
     const before = manifest.scripts['pretest:integration'] ?? '';
     expect(before).toContain('npm run compile');
     expect(before).toContain('tsconfig.test.json');
+  });
+
+  const runs = async () =>
+    (await import(pathToFileURL('.vscode-test.mjs').href)).default as { version?: string; useInstallation?: object }[];
+
+  it('downloads each editor at an exact version', async () => {
+    // 'stable' changes what a run tests without a commit, and keeps one more build per release.
+    const downloaded = (await runs()).filter((r) => r.useInstallation === undefined);
+    expect(downloaded.map((r) => r.version).filter((v) => !/^\d+\.\d+\.\d+$/.test(v ?? ''))).toEqual([]);
+  });
+
+  it('runs on the engines.vscode floor', async () => {
+    expect((await runs()).map((r) => r.version)).toContain(floor);
   });
 });
 

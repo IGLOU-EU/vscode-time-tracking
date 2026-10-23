@@ -61,10 +61,16 @@ npm run lint              # eslint
 npm run test:unit         # Vitest on the pure core
 npm run test:unit:watch   # TDD loop (red-green-refactor)
 npm run compile           # type-check + esbuild bundle to dist/
-npm run test:integration  # compile, then smoke tests in a real Extension Host, on the stable and the oldest supported editor
+npm run test:integration  # compile, then smoke tests in a real Extension Host, on a recent and the oldest supported editor
 ```
 
 Use the Node version required by `engines.node` in [`package.json`](package.json), as npm refuses to install on another one. Press `F5` in VSCode/VSCodium to compile and launch the Extension Development Host on the sample workspace (`.vscode/launch.json`), with a dedicated profile under `.vscode-test/` and the other extensions disabled, and try the extension live.
+
+The integration tests download the editors they run on into `.vscode-test/`: the oldest supported one, and a recent one pinned in [`.vscode-test.mjs`](.vscode-test.mjs), which says when to raise it. To run them on VSCodium as well, set `VSCODIUM_PATH` to the Electron binary of a local install, the `codium` file next to its `resources/` folder (its path depends on the install), not the `bin/codium` launcher script: it goes through the editor command line and returns at once, so the run reports success without any test. On Linux, `xvfb-run -a` keeps the test windows off the screen:
+
+```bash
+VSCODIUM_PATH=/opt/vscodium-bin/codium xvfb-run -a npm run test:integration
+```
 
 ## External documentation
 
