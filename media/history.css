@@ -34,38 +34,6 @@ body {
   font-weight: 600;
 }
 
-.tt-actions {
-  display: flex;
-  gap: 4px;
-}
-
-/* Icons follow the same base font as the rest, so accessibility scaling covers them too. The hover
-   target is in em as well so it never overflows the glyph at large sizes. */
-.tt-actions button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6em;
-  height: 1.6em;
-  padding: 0;
-  background: transparent;
-  color: var(--vscode-icon-foreground, var(--vscode-foreground));
-  border: none;
-  border-radius: 5px;
-  font-size: 1em;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.tt-actions button:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
-}
-
-/* Codicon glyphs scale with the panel font instead of the codicon.css fixed 16px, for accessibility. */
-.tt-actions .codicon {
-  font-size: 1.15em;
-}
-
 /* Sections */
 .tt-section {
   margin-top: 20px;
@@ -102,12 +70,16 @@ body {
   cursor: pointer;
 }
 
-.tt-badge-link .codicon {
+/* Sized in em by the page, so it scales with the panel font, for accessibility. */
+.tt-badge-icon {
   position: absolute;
   right: 8px;
   bottom: 8px;
   font-size: var(--tt-fs-small);
-  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+  fill: none;
+  stroke: var(--vscode-descriptionForeground, var(--vscode-foreground));
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
 
 .tt-badge-link:focus-visible {

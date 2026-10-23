@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The extension package is less than half its former size, 57 KB instead of 126 KB, as the History panel no longer ships an icon font. The magnifier of last month's total is drawn by the panel itself, and the Back button of the months page is now a text button.
 - The extension now installs on VSCode and VSCodium 1.82 and later, instead of 1.93. The README claimed that older editors were supported, yet they refused to install it. Before 1.93, a command running in the integrated terminal is not seen as a running process, and everything else works the same.
 
 ### Fixed

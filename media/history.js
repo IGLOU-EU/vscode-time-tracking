@@ -64,7 +64,9 @@
       (m.variationText
         ? `<div class="tt-delta tt-${esc(m.variationDir || 'na')}">${esc(m.variationText)}</div>`
         : '') +
-      `<i class="codicon codicon-search" aria-hidden="true"></i>` +
+      // A magnifier drawn here, from a circle and a stroke, so the page needs no icon font.
+      `<svg class="tt-badge-icon" width="1em" height="1em" viewBox="0 0 16 16" aria-hidden="true">` +
+      `<circle cx="6.5" cy="6.5" r="4.5"></circle><line x1="10" y1="10" x2="14.5" y2="14.5"></line></svg>` +
       `</div>`;
     const thisMonthCard =
       `<div class="tt-badge">` +
@@ -151,9 +153,7 @@
     app.innerHTML =
       `<div class="tt-header">` +
       `<h1>${esc(s.months || 'Months')}</h1>` +
-      `<div class="tt-actions">` +
-      `<button id="tt-back" title="${esc(s.back || 'Back')}"><i class="codicon codicon-arrow-left"></i></button>` +
-      `</div>` +
+      `<button type="button" id="tt-back" class="tt-btn tt-btn-secondary">${esc(s.back || 'Back')}</button>` +
       `</div>` +
       `<div class="tt-badges">${card(s.total || 'Total', payload.totalLabel || '0m')}</div>` +
       `<div class="tt-badges">${months.map((m) => card(m.label || '', m.hoursLabel || '0m')).join('')}</div>`;

@@ -66,6 +66,12 @@ describe('HistoryViewProvider', () => {
     expect(view.webview.html).toContain('<html lang="fr">');
   });
 
+  it('loads no font in the page', () => {
+    const view = fakeView();
+    providerFor(view);
+    expect(view.webview.html).not.toMatch(/codicon|font-src/);
+  });
+
   it('keeps the badge of a hidden view up to date, without posting to its page', async () => {
     // The badge shows on the activity bar precisely while the view is out of sight.
     const view = fakeView(false);

@@ -57,6 +57,7 @@ function loadPage(state?: unknown) {
   return {
     show: (...dates: string[]) => onMessage({ data: { type: 'history', payload: { strings: {}, days: dates.map(day) } } }),
     receive: (message: unknown) => onMessage({ data: message }),
+    markup: () => app.innerHTML,
     modals: () => modals.map((m) => m.innerHTML),
     click: (date: string) => clicks.get(date)?.(),
     expanded: () => [...app.innerHTML.matchAll(/<li class="[^"]*\btt-expanded\b[^"]*" data-date="(\d+)">/g)].map((m) => m[1]),
@@ -109,6 +110,16 @@ describe('history.js', () => {
     const page = loadPage(state);
     page.show('20261020');
     expect(page.expanded()).toEqual([]);
+  });
+
+  it.each([
+    ['history', { strings: {}, days: [day('20261021')] }],
+    ['months', { totalLabel: '2h 00m', months: [{ label: 'October 2026', hoursLabel: '2h 00m' }] }],
+  ])('draws the %s page without an icon font', (type, payload) => {
+    // The font weighed more than half of the package.
+    const page = loadPage();
+    page.receive({ type, payload });
+    expect(page.markup()).not.toContain('codicon');
   });
 
   it('opens the add-time form when the host asks for it', () => {

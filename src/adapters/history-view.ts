@@ -235,14 +235,11 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
     // window reload, serving an old build. The nonce is fresh on every html build (so every reload).
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history.js')).with({ query: `v=${nonce}` });
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'history.css')).with({ query: `v=${nonce}` });
-    // Codicon font (vendored from @vscode/codicons) for the native toolbar icons.
-    const codiconUri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'codicon.css'));
     const csp = [
       `default-src 'none'`,
       `img-src ${webview.cspSource} data:`,
       `style-src ${webview.cspSource}`,
       `script-src 'nonce-${nonce}'`,
-      `font-src ${webview.cspSource}`,
     ].join('; ');
     return `<!DOCTYPE html>
 <html lang="${vscode.env.language}">
@@ -250,7 +247,6 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="${codiconUri}" rel="stylesheet" />
   <link href="${styleUri}" rel="stylesheet" />
   <title>${vscode.l10n.t('History')}</title>
 </head>
