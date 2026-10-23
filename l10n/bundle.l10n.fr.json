@@ -4,7 +4,8 @@
   "Tracking": "Suivi en cours",
   "Paused": "En pause",
   "Awaiting confirmation": "En attente de confirmation",
-  "Today: {hours}h {minutes}m": "Aujourd'hui : {hours} h {minutes} min",
+  "{session} (idle -{minutes}m)": "{session} (idle -{minutes}m)",
+  "{session} (out -{minutes}m)": "{session} (out -{minutes}m)",
   "Session: {hours}h {minutes}m": "Session : {hours} h {minutes} min",
   "Time tracking: no tracking": "Suivi du temps : pas de décompte",
   "{count} hours tracked today": "{count} heures suivies aujourd'hui",
@@ -61,6 +62,5 @@
   "More": "Plus",
   "commits": "commits",
   "Session": "Session",
-  "No tracking data yet.": "Aucune donnée de suivi pour le moment.",
-  "{count} commits": "{count} commits"
+  "No tracking data yet.": "Aucune donnée de suivi pour le moment."
 }
