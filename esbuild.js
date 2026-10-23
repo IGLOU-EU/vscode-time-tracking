@@ -29,7 +29,11 @@ async function main() {
     sourcemap: !production,
     sourcesContent: false,
     platform: 'node',
-    target: 'node18',
+    // The Node of the extension host at the engines.vscode floor, not engines.node (which is the
+    // dev toolchain). VSCode 1.82 runs Electron 25 with Node 18.15.0
+    // (https://code.visualstudio.com/updates/v1_82#_electron-25-update), and its remote server the
+    // same Node (remote/.yarnrc on the release/1.82 branch of microsoft/vscode). Moves with the floor.
+    target: 'node18.15',
     outfile: 'dist/extension.js',
     // 'vscode' is injected by the runtime: NEVER bundle it.
     external: ['vscode'],

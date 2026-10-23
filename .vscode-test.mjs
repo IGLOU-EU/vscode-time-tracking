@@ -1,10 +1,8 @@
 import { defineConfig } from '@vscode/test-cli';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-// Node 18 does not provide import.meta.dirname, so we derive it from import.meta.url.
-const here = path.dirname(fileURLToPath(import.meta.url));
+const here = import.meta.dirname;
 
 // The suite also runs on the oldest editor engines.vscode accepts, so an API or a manifest field
 // missing there fails here instead of on a user's older editor.

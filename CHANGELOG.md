@@ -22,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The CI builds the extension bundle on every push, as the local checks already require.
 - The editor API types are pinned to the minimum supported VSCode version, so a call to a newer API fails the type check instead of breaking on older editors.
 - The integration tests also run on the minimum supported VSCode version, and a unit test keeps the API types and the README on that version.
+- The development Node version in `engines.node` now matches what the build tools require, and npm refuses to install on another one. The extension bundle targets the Node of the oldest supported editor instead.
 
 ## [1.3.1] - 2026-08-04
 
