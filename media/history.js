@@ -13,6 +13,10 @@
   // redraws the main view without a round trip.
   let lastHistory = /** @type {any} */ (null);
   let monthsShown = false;
+  // The days the user expanded, by date. The webview state keeps them across a refresh, which
+  // rebuilds the list every minute, and across the reload of a page the hidden view freed.
+  const saved = /** @type {{ expanded?: unknown } | undefined} */ (vscode.getState());
+  let expanded = new Set(Array.isArray(saved?.expanded) ? saved.expanded.filter((d) => typeof d === 'string') : []);
 
   // Quotes included: esc() also feeds double-quoted attribute values (option/input `value="..."`),
   // where an unescaped quote would truncate the value and inject stray attributes.
@@ -48,6 +52,7 @@
     lastStrings = s;
     lastReasons = Array.isArray(payload.manualReasons) ? payload.manualReasons : [];
     const m = payload.months || {};
+    /** @type {Array<{ date: string, label?: string, hoursLabel?: string, commitsLabel?: string, sessionsLabel?: string }>} */
     const days = Array.isArray(payload.days) ? payload.days : [];
 
     // Last month first, then this month (side by side when the panel is wide enough). The last
@@ -79,10 +84,11 @@
       : '';
 
     const dayRows = days
-      .map((/** @type {{ label?: string, date: string, hoursLabel?: string, commitsLabel?: string, sessionsLabel?: string }} */ d) => {
+      .map((d) => {
         const sessions = d.sessionsLabel ? `<div class="tt-sessions">${esc(d.sessionsLabel)}</div>` : '';
+        const rowClass = d.sessionsLabel ? (expanded.has(d.date) ? ' tt-clickable tt-expanded' : ' tt-clickable') : '';
         return (
-          `<li class="tt-day-item${d.sessionsLabel ? ' tt-clickable' : ''}">` +
+          `<li class="tt-day-item${rowClass}" data-date="${esc(d.date)}">` +
           `<div class="tt-day">` +
           `<span class="tt-day-date">${esc(d.label || d.date)}</span>` +
           `<span class="tt-day-right">` +
@@ -134,7 +140,13 @@
     }
     // Click a day with several sessions to expand its full breakdown (toggle the ellipsis off).
     app.querySelectorAll('.tt-clickable').forEach((li) =>
-      li.addEventListener('click', () => li.classList.toggle('tt-expanded')),
+      li.addEventListener('click', () => {
+        const open = li.classList.toggle('tt-expanded');
+        const date = li.getAttribute('data-date');
+        // Saved among the days shown, so the state never outgrows the list.
+        expanded = new Set(days.map((d) => d.date).filter((d) => (d === date ? open : expanded.has(d))));
+        vscode.setState({ expanded: [...expanded] });
+      }),
     );
   }
 

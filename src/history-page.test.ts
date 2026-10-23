@@ -1,7 +1,94 @@
 // The History page under media/ is plain browser code that no bundler touches, so it is read here
 // as the webview loads it.
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
+
+const PAGE = readFileSync('media/history.js', 'utf8');
+
+// The page run against the few DOM calls it makes to draw the day list: it is enough to read the
+// markup it writes and to click a day, without a DOM library.
+function loadPage(state?: unknown) {
+  let saved = state;
+  let onMessage = (_event: { data: unknown }): void => undefined;
+  const clicks = new Map<string, () => void>();
+  const app = {
+    innerHTML: '',
+    // The page looks rows up only to wire their click, so the fakes are read off the markup.
+    querySelectorAll: () =>
+      [...app.innerHTML.matchAll(/<li class="([^"]*)" data-date="(\d+)">/g)].map(([, classes, date]) => {
+        const names = new Set(classes.split(' '));
+        return {
+          getAttribute: () => date,
+          classList: { toggle: (name: string) => (names.delete(name) ? false : (names.add(name), true)) },
+          addEventListener: (_type: string, listener: () => void) => clicks.set(date, listener),
+        };
+      }),
+  };
+  runInNewContext(PAGE, {
+    acquireVsCodeApi: () => ({
+      postMessage: () => undefined,
+      getState: () => saved,
+      setState: (next: unknown) => (saved = next),
+    }),
+    document: { getElementById: (id: string) => (id === 'app' ? app : null), body: { style: {} } },
+    window: { addEventListener: (type: string, listener: typeof onMessage) => type === 'message' && (onMessage = listener) },
+  });
+  return {
+    show: (...dates: string[]) => onMessage({ data: { type: 'history', payload: { strings: {}, days: dates.map(day) } } }),
+    click: (date: string) => clicks.get(date)?.(),
+    expanded: () => [...app.innerHTML.matchAll(/<li class="[^"]*\btt-expanded\b[^"]*" data-date="(\d+)">/g)].map((m) => m[1]),
+    state: () => saved,
+  };
+}
+
+// A day with two sessions, which the list shows on one line until it is clicked.
+function day(date: string) {
+  return { date, label: date, hoursLabel: '2h 00m', commitsLabel: '0 commits', sessionsLabel: 'Session 1 · Session 2' };
+}
+
+describe('history.js', () => {
+  it('keeps a day expanded when the refresh redraws the list', () => {
+    const page = loadPage();
+    page.show('20261021', '20261020');
+    page.click('20261020');
+    page.show('20261021', '20261020');
+    expect(page.expanded()).toEqual(['20261020']);
+  });
+
+  it('keeps a day collapsed once clicked again', () => {
+    const page = loadPage();
+    page.show('20261021', '20261020');
+    page.click('20261020');
+    page.click('20261020');
+    page.show('20261021', '20261020');
+    expect(page.expanded()).toEqual([]);
+  });
+
+  it('expands the same days on a page reloaded after the view was hidden', () => {
+    const before = loadPage();
+    before.show('20261021', '20261020');
+    before.click('20261021');
+    const after = loadPage(before.state());
+    after.show('20261021', '20261020');
+    expect(after.expanded()).toEqual(['20261021']);
+  });
+
+  it('saves only the expanded days the list still shows', () => {
+    const page = loadPage();
+    page.show('20261020', '20261006');
+    page.click('20261006');
+    page.show('20261021', '20261020');
+    page.click('20261020');
+    expect(page.state()).toEqual({ expanded: ['20261020'] });
+  });
+
+  it.each([undefined, 42, { expanded: '20261020' }, { expanded: [20261020] }])('draws from a saved state %j', (state) => {
+    const page = loadPage(state);
+    page.show('20261020');
+    expect(page.expanded()).toEqual([]);
+  });
+});
 
 describe('history.css', () => {
   it('scales the panel from the editor font size, which a fontSize of 0 leaves in place', () => {
