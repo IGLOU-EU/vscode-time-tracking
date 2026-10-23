@@ -314,7 +314,7 @@
     "test:unit:watch": "vitest",
     "bench": "vitest bench --run",
     "test:coverage": "vitest run --coverage",
-    "pretest": "tsc -p ./tsconfig.test.json",
+    "pretest:integration": "npm run compile && tsc -p ./tsconfig.test.json",
     "test:integration": "vscode-test",
     "l10n:export": "npx @vscode/l10n-dev export -o ./l10n ./src"
   },

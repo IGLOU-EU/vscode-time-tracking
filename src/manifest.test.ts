@@ -67,6 +67,17 @@ describe('F5 launch configuration', () => {
   });
 });
 
+describe('integration suite', () => {
+  it('builds the bundle and the tests before it runs', () => {
+    // The host loads the extension from main (dist/) and the runner loads the compiled tests (out/).
+    // npm runs pre<script> before <script> on its own, extra arguments included:
+    // https://docs.npmjs.com/cli/v10/using-npm/scripts#pre--post-scripts
+    const before = manifest.scripts['pretest:integration'] ?? '';
+    expect(before).toContain('npm run compile');
+    expect(before).toContain('tsconfig.test.json');
+  });
+});
+
 describe('contributed menus', () => {
   const { commands, menus, views } = manifest.contributes;
   const items = Object.values(menus).flat();
