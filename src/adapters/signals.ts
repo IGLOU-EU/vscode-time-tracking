@@ -152,7 +152,11 @@ export function registerSignals(context: vscode.ExtensionContext, sinks: SignalS
     vscode.tasks.onDidEndTaskProcess(() => bumpProcess(-1)),
   );
 
-  // Terminal shell integration is 1.93+. Feature-gate so older VSCodium builds still load.
+  // The terminal shell execution events are 1.93+, above the engines.vscode floor, so they are
+  // missing from the pinned types and undefined on an older editor: detect them before use. Without
+  // them a terminal command goes unseen as a running process, and everything else still works. They
+  // fire only in a terminal where shell integration is active.
+  // https://code.visualstudio.com/updates/v1_93#_terminal-shell-integration-api
   const win = vscode.window as unknown as {
     onDidStartTerminalShellExecution?: vscode.Event<unknown>;
     onDidEndTerminalShellExecution?: vscode.Event<unknown>;

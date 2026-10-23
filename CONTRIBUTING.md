@@ -61,7 +61,7 @@ npm run lint              # eslint
 npm run test:unit         # Vitest on the pure core
 npm run test:unit:watch   # TDD loop (red-green-refactor)
 npm run compile           # type-check + esbuild bundle to dist/
-npm run test:integration  # smoke tests inside a real Extension Host
+npm run test:integration  # smoke tests in a real Extension Host, on the stable and the oldest supported editor
 ```
 
 Use the Node version required by `engines.node` in [`package.json`](package.json). Press `F5` in VSCode/VSCodium to launch the Extension Development Host and try the extension live.
@@ -69,6 +69,8 @@ Use the Node version required by `engines.node` in [`package.json`](package.json
 ## External documentation
 
 Anything touching the VSCode API must be backed by the authoritative docs, not training-data guesses. The API ships monthly and `since` versions matter for VSCodium compatibility. Cite the source in a comment when the choice is not obvious.
+
+The oldest supported editor is `engines.vscode` in [`package.json`](package.json), and `@types/vscode` is pinned to it with a tilde, so the type check refuses a newer API. Every API, contribution point and webview feature must exist at that version, whose Electron sets the Node of the extension host and the Chromium of the webview (see the release notes of that version). Terminal shell integration (1.93) is the one API above it, feature-detected in `src/adapters/signals.ts`. Anything else newer raises the floor, and the README compatibility section follows it.
 
 | What you're touching | Where to look first |
 | --- | --- |

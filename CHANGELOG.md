@@ -9,6 +9,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Clicking last month's total in the History panel opens a page with the project's total tracked time and the total of every month worked.
 
+### Changed
+
+- The extension now installs on VSCode and VSCodium 1.82 and later, instead of 1.93. The README claimed that older editors were supported, yet they refused to install it. Before 1.93, a command running in the integrated terminal is not seen as a running process, and everything else works the same.
+
 ### Fixed
 
 - Closing a window no longer risks losing the session it was tracking. The session was saved without waiting while its crash-recovery copy was already being deleted, so an editor shutting down at that moment could lose both. The copy is now deleted only once the session is on disk, and a save that fails is written to the debug log.
@@ -17,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The CI builds the extension bundle on every push, as the local checks already require.
 - The editor API types are pinned to the minimum supported VSCode version, so a call to a newer API fails the type check instead of breaking on older editors.
+- The integration tests also run on the minimum supported VSCode version, and a unit test keeps the API types and the README on that version.
 
 ## [1.3.1] - 2026-08-04
 

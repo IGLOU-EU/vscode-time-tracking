@@ -116,9 +116,9 @@ layout).
 
 ## Compatibility
 
-Works on VSCode and VSCodium. No proprietary dependency, no network
-calls. Targets `engines.vscode >= 1.93` so terminal shell integration is
-available; older clients degrade gracefully.
+Works on VSCode and VSCodium 1.82 or later. No proprietary dependency, no network calls.
+
+From 1.93, a command running in the integrated terminal counts as a running process, through [terminal shell integration](https://code.visualstudio.com/docs/terminal/shell-integration) (on by default for bash, fish, pwsh, zsh and Git Bash). From 1.82 to 1.92, such a command is not seen: it neither starts a session nor keeps an unfocused session going under the background timeout. Everything else works the same, including tasks, debug sessions and the files a terminal command writes in the workspace.
 
 ## Development
 
