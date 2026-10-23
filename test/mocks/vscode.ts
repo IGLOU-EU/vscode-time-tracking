@@ -31,6 +31,23 @@ export const window = {
   createStatusBarItem: (): Record<string, unknown> => ({ show() {}, dispose() {} }),
 };
 
+// An event that nobody fires: a spec replaces it to fire it when the scenario says so.
+const silentEvent = (): { dispose(): void } => ({ dispose() {} });
+
+// A spec replaces these to play a workspace that is not trusted yet, then the trust grant.
+export const workspace = {
+  get isTrusted(): boolean {
+    return true;
+  },
+  onDidGrantWorkspaceTrust: silentEvent,
+};
+
+// A spec replaces these to play the built-in git extension appearing or going.
+export const extensions = {
+  getExtension: (_id: string): unknown => undefined,
+  onDidChange: silentEvent,
+};
+
 // A spec replaces executeCommand to play what the editor does in answer, such as revealing a view.
 export const commands = {
   executeCommand: (_command: string, ..._args: unknown[]): Promise<unknown> => Promise.resolve(undefined),

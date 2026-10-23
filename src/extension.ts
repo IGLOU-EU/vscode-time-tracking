@@ -17,7 +17,7 @@ import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
 import { StorageAdapter } from './adapters/storage';
 import { registerSignals } from './adapters/signals';
-import { getGitApi, CommitCounts } from './adapters/git';
+import { whenGitApiReady, CommitCounts } from './adapters/git';
 import { HistoryViewProvider, type HistoryPayload, type HistoryDataPort } from './adapters/history-view';
 import type { MonthsPayload } from './adapters/history-view';
 import { createExportFlow, monthLabel } from './adapters/export';
@@ -453,12 +453,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Initial project + crash recovery + git, then first render.
   const initialFolder = activeFolderUri();
   if (initialFolder) await setProject(initialFolder);
-  void getGitApi().then((api) => {
-    if (!api) return;
-    commitCounts = new CommitCounts(api);
-    context.subscriptions.push(commitCounts);
-    refreshHistory();
-  });
+  context.subscriptions.push(
+    whenGitApiReady((api) => {
+      commitCounts = new CommitCounts(api);
+      context.subscriptions.push(commitCounts);
+      refreshHistory();
+    }),
+  );
   refreshStatus(Date.now());
 
   onDeactivate = async () => {

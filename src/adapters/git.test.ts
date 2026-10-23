@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { CommitCounts } from './git';
-import type { API as GitAPI, Commit, Repository } from './git-types';
-import type { Uri } from 'vscode';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { extensions, workspace } from 'vscode';
+import { CommitCounts, whenGitApiReady } from './git';
+import type { API as GitAPI, Commit, GitExtension, Repository } from './git-types';
+import type { Extension, Uri } from 'vscode';
 
 const MY = 'me@example.com';
 const folder = {} as unknown as Uri; // the fake api ignores it
@@ -137,5 +138,104 @@ describe('CommitCounts', () => {
     expect(await cc.byDay(folder, MY, 0)).toEqual({});
     expect(await cc.byDay(folder, MY, 0)).toEqual({});
     expect(fake.logCalls()).toBe(1); // an authoritative empty count is cacheable
+  });
+});
+
+// An event the spec fires by hand, in place of the editor.
+function manualEvent() {
+  const listeners = new Set<() => void>();
+  return {
+    event: (listener: () => void) => {
+      listeners.add(listener);
+      return { dispose: () => listeners.delete(listener) };
+    },
+    fire: () => [...listeners].forEach((listener) => listener()),
+  };
+}
+
+// Lets every pending promise callback run, as the editor would between two events.
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe('whenGitApiReady', () => {
+  const api = { state: 'initialized' } as unknown as GitAPI;
+  const gitExtension = { isActive: true, exports: { enabled: true, getAPI: () => api } } as unknown as Extension<GitExtension>;
+  let trusted = true;
+  let gitInstalled = true;
+  const trustGranted = manualEvent();
+  const extensionsChanged = manualEvent();
+
+  const play = (): void => {
+    vi.spyOn(workspace, 'isTrusted', 'get').mockImplementation(() => trusted);
+    vi.spyOn(workspace, 'onDidGrantWorkspaceTrust').mockImplementation(trustGranted.event);
+    vi.spyOn(extensions, 'onDidChange').mockImplementation(extensionsChanged.event);
+    vi.spyOn(extensions, 'getExtension').mockImplementation((() => (gitInstalled ? gitExtension : undefined)) as never);
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    trusted = true;
+    gitInstalled = true;
+  });
+
+  it('hands over the git API of a trusted workspace', async () => {
+    play();
+    const ready = vi.fn();
+    whenGitApiReady(ready);
+    await settle();
+    expect(ready).toHaveBeenCalledWith(api);
+  });
+
+  // In Restricted Mode, git must not run: a hostile repository can make it run a command
+  // (core.fsmonitor), and the manifest promises that commits are not counted there.
+  it('leaves git alone while the workspace is not trusted', async () => {
+    trusted = false;
+    play();
+    const ready = vi.fn();
+    whenGitApiReady(ready);
+    extensionsChanged.fire();
+    await settle();
+    expect(extensions.getExtension).not.toHaveBeenCalled();
+    expect(ready).not.toHaveBeenCalled();
+  });
+
+  it('hands over the git API once the workspace is trusted', async () => {
+    trusted = false;
+    play();
+    const ready = vi.fn();
+    whenGitApiReady(ready);
+    await settle();
+    expect(ready).not.toHaveBeenCalled();
+    trusted = true;
+    trustGranted.fire();
+    await settle();
+    expect(ready).toHaveBeenCalledWith(api);
+  });
+
+  // The editor grants trust first, and only then enables the git extension it kept disabled.
+  it('waits for the git extension that the trust grant enables', async () => {
+    trusted = false;
+    gitInstalled = false;
+    play();
+    const ready = vi.fn();
+    whenGitApiReady(ready);
+    trusted = true;
+    trustGranted.fire();
+    await settle();
+    expect(ready).not.toHaveBeenCalled();
+    gitInstalled = true;
+    extensionsChanged.fire();
+    await settle();
+    expect(ready).toHaveBeenCalledWith(api);
+  });
+
+  it('hands over the git API once, however many events follow', async () => {
+    play();
+    const ready = vi.fn();
+    whenGitApiReady(ready);
+    await settle();
+    trustGranted.fire();
+    extensionsChanged.fire();
+    await settle();
+    expect(ready).toHaveBeenCalledTimes(1);
   });
 });

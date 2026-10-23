@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Trusting a folder opened in Restricted Mode now shows its git commits in the History panel right away. They stayed missing until the window was reloaded.
 - In a window opened on no folder, the status bar now shows "no tracking", and its tooltip says that time is not counted without a folder. It showed a running session as soon as you typed, though that time was never saved.
 - The badge that shows today's tracked hours on the History view's activity bar icon now stays up to date while the view is hidden, which is when you see it. It kept the count of the last time the view was on screen. As before, it appears once the view has been shown in the window.
 - A day you expand in the History list now stays expanded when the panel refreshes, every minute during a session, and when you come back to a hidden view. It folded back to one line.

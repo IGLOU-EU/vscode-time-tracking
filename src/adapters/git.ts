@@ -1,10 +1,11 @@
 // Adapter: counts the user's commits per local day through the built-in git extension API.
-// Degrades gracefully (returns {}) when git is disabled, absent, or has no email configured.
+// Degrades gracefully (returns {}) when git is disabled, absent, or has no email configured, and
+// leaves git alone until the workspace is trusted.
 import * as vscode from 'vscode';
 import type { API as GitAPI, GitExtension, Commit, Repository } from './git-types';
 import { countMyCommitsByDay, countMyCommitsForDay, localDayBounds, type CommitRecord } from '../core/commits';
 
-export async function getGitApi(): Promise<GitAPI | undefined> {
+async function getGitApi(): Promise<GitAPI | undefined> {
   const ext = vscode.extensions.getExtension<GitExtension>('vscode.git');
   if (!ext) return undefined;
   const gitExt = ext.isActive ? ext.exports : await ext.activate();
@@ -19,6 +20,39 @@ export async function getGitApi(): Promise<GitAPI | undefined> {
     });
   });
   return api;
+}
+
+/**
+ * Hands the git API to onReady once, as soon as it can be had. An untrusted workspace never gets it,
+ * as the manifest promises (capabilities.untrustedWorkspaces): git runs commands that the config of
+ * a hostile repository can set, such as core.fsmonitor. The built-in git extension does not run
+ * there either. Trusting the workspace enables it without a reload, but after the grant event,
+ * hence the second listener (seen on 1.82, 1.143 and VSCodium 1.121). Both events and isTrusted
+ * exist in 1.82. https://code.visualstudio.com/api/extension-guides/workspace-trust
+ */
+export function whenGitApiReady(onReady: (api: GitAPI) => void): vscode.Disposable {
+  let ready = false;
+  let asking = false;
+  const tryNow = (): void => {
+    if (ready || asking || !vscode.workspace.isTrusted) return;
+    asking = true;
+    getGitApi().then(
+      (api) => {
+        asking = false;
+        if (!api || ready) return;
+        ready = true;
+        stop();
+        onReady(api);
+      },
+      () => {
+        asking = false; // an extension that fails to activate is tried again on the next change
+      },
+    );
+  };
+  const listeners = [vscode.workspace.onDidGrantWorkspaceTrust(tryNow), vscode.extensions.onDidChange(tryNow)];
+  const stop = (): void => listeners.forEach((listener) => listener.dispose());
+  tryNow();
+  return { dispose: stop };
 }
 
 // The API's getConfig reads the repository-local scope only, while most setups define user.email
