@@ -1,35 +1,38 @@
 import { describe, it, expect } from 'vitest';
 import { buildDays, buildHistoryModel, historyWindowStartMs, type TaggedInterval } from './history';
+import type { HeatmapLabels } from './charts';
 
 const at = (y: number, mo1: number, d: number, hh = 0, mm = 0): number =>
   new Date(y, mo1 - 1, d, hh, mm, 0, 0).getTime();
 const h = (n: number): number => n * 3_600_000;
 const NOW = at(2026, 6, 16, 12); // anchor: June 16, 2026, noon
+// The heatmap words are tested with the renderer, so any will do here.
+const LABELS: HeatmapLabels = { months: Array<string>(12).fill('m'), weekdays: Array<string>(7).fill('d'), dayTitle: () => 't' };
 const tagged = (windowId: string, start: number, end: number): TaggedInterval => ({ windowId, start, end });
 
 describe('buildHistoryModel', () => {
   it('combines per-day seconds with the commit counts for the same day', () => {
     const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 12))];
-    const model = buildHistoryModel(intervals, { '20260616': 4 }, NOW);
+    const model = buildHistoryModel(intervals, { '20260616': 4 }, NOW, LABELS);
     expect(model.days[0]).toMatchObject({ date: '20260616', seconds: h(3) / 1000, commits: 4 });
   });
 
   it('defaults commits to zero for days without git data', () => {
     const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 10))];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].commits).toBe(0);
   });
 
   it('produces non-empty SVG charts when there is data in the window', () => {
     const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 10))];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.trendSvg).toContain('<svg');
     expect(model.heatmapSvg).toContain('<svg');
   });
 
   it('draws the 24h activity curve when there is activity within the last day', () => {
     const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 10))]; // 3h before NOW
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.trendSvg).toContain('<path class="tt-trend-line"');
     expect(model.trendSvg).toContain('<path class="tt-trend-area"');
     expect(model.trendSvg).not.toContain('tt-trend-dot'); // density curve has no per-point dots
@@ -37,7 +40,7 @@ describe('buildHistoryModel', () => {
 
   it('leaves the 24h trend empty when all activity is older than 24h, keeping the heatmap', () => {
     const intervals = [tagged('w1', at(2026, 6, 14, 9), at(2026, 6, 14, 12))]; // two days before NOW
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.trendSvg).toBe(''); // nothing in the last 24h -> no curve
     expect(model.heatmapSvg).not.toBe(''); // but the day still shows in the heatmap and day list
   });
@@ -47,13 +50,13 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 5, 10, 9), at(2026, 5, 10, 11)), // May: 2h
       tagged('w1', at(2026, 6, 1, 9), at(2026, 6, 1, 12)), // June: 3h
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.months.currentMs).toBe(h(3));
     expect(model.months.previousMs).toBe(h(2));
   });
 
   it('returns empty data and empty charts for no intervals', () => {
-    const model = buildHistoryModel([], {}, NOW);
+    const model = buildHistoryModel([], {}, NOW, LABELS);
     expect(model.days).toEqual([]);
     expect(model.months.currentMs).toBe(0);
     expect(model.trendSvg).toBe(''); // all-zero window -> no SVG, webview shows the empty state
@@ -62,7 +65,7 @@ describe('buildHistoryModel', () => {
 
   it('reports a single window for a day touched by one window', () => {
     const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 12))];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].windows).toHaveLength(1);
     expect(model.days[0].windows[0]).toMatchObject({ windowId: 'w1', ms: h(3) });
   });
@@ -72,7 +75,7 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 6, 16, 14), at(2026, 6, 16, 16)), // 14:00-16:00 (2h)
       tagged('w2', at(2026, 6, 16, 14, 30), at(2026, 6, 16, 17)), // 14:30-17:00 (2.5h)
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     const day = model.days[0];
     expect(day.seconds).toBe(h(3) / 1000); // merged union, no double counting
     expect(day.windows).toHaveLength(2);
@@ -85,14 +88,14 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)),
       tagged('w1', at(2026, 6, 16, 10), at(2026, 6, 16, 12)),
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].windows).toHaveLength(1);
     expect(model.days[0].windows[0].ranges).toEqual([{ start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12) }]);
   });
 
   it('reports a single session for one continuous block', () => {
     const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 12))];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([{ start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12) }]);
   });
 
@@ -101,7 +104,7 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)), // morning
       tagged('w1', at(2026, 6, 16, 14), at(2026, 6, 16, 15)), // afternoon: a real gap -> a second session
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11) },
       { start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15) },
@@ -115,7 +118,7 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 6, 16, 14), at(2026, 6, 16, 16)),
       tagged('w2', at(2026, 6, 16, 15), at(2026, 6, 16, 17)),
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].seconds).toBe(h(3) / 1000);
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 16) },
@@ -128,7 +131,7 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 6, 16, 14), at(2026, 6, 16, 17)),
       tagged('w2', at(2026, 6, 16, 15), at(2026, 6, 16, 16)),
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([{ start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 17) }]);
   });
 
@@ -136,7 +139,7 @@ describe('buildHistoryModel', () => {
     const intervals: TaggedInterval[] = [
       { windowId: 'w1', start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' },
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 16, 14), end: at(2026, 6, 16, 15), reason: 'Meeting' },
     ]);
@@ -144,7 +147,7 @@ describe('buildHistoryModel', () => {
 
   it('keeps auto-tracked session blocks free of a reason field', () => {
     const intervals = [tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 10))];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions[0]).not.toHaveProperty('reason');
   });
 
@@ -153,7 +156,7 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)), // auto 2h
       { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' }, // manual, overlaps
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].seconds).toBe(h(3) / 1000); // 09:00-12:00 union, counted once
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10) },
@@ -166,7 +169,7 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 17)),
       { windowId: 'w1', start: at(2026, 6, 16, 12), end: at(2026, 6, 16, 12, 30), reason: 'Meeting' },
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 12) },
       { start: at(2026, 6, 16, 12), end: at(2026, 6, 16, 12, 30), reason: 'Meeting' },
@@ -179,7 +182,7 @@ describe('buildHistoryModel', () => {
       { windowId: 'w1', start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
       { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 11), reason: 'Review' },
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
       { start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 11), reason: 'Review' },
@@ -191,7 +194,7 @@ describe('buildHistoryModel', () => {
       { windowId: 'w1', start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 11), reason: 'Meeting' },
       { windowId: 'w1', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Review' },
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10), reason: 'Meeting' },
       { start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 11), reason: 'Meeting, Review' },
@@ -206,7 +209,7 @@ describe('buildHistoryModel', () => {
       tagged('w1', at(2026, 6, 16, 9), at(2026, 6, 16, 11)),
       { windowId: 'w2', start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' },
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 16, 9), end: at(2026, 6, 16, 10) },
       { start: at(2026, 6, 16, 10), end: at(2026, 6, 16, 12), reason: 'Meeting' },
@@ -217,7 +220,7 @@ describe('buildHistoryModel', () => {
     const intervals: TaggedInterval[] = [
       { windowId: 'w1', start: at(2026, 6, 15, 23), end: at(2026, 6, 16, 1), reason: 'Deploy' },
     ];
-    const model = buildHistoryModel(intervals, {}, NOW);
+    const model = buildHistoryModel(intervals, {}, NOW, LABELS);
     expect(model.days[0].sessions).toEqual([
       { start: at(2026, 6, 15, 23), end: at(2026, 6, 16), reason: 'Deploy' },
     ]);

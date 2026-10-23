@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { renderTrend, renderCalendarHeatmap, type DayValue } from './charts';
+import { renderTrend, renderCalendarHeatmap, type DayValue, type HeatmapLabels } from './charts';
 
 const count = (haystack: string, needle: string): number => haystack.split(needle).length - 1;
+// Placeholder words, so a test sees where each label lands and that no English is left in the core.
+const LABELS: HeatmapLabels = {
+  months: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12'],
+  weekdays: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'],
+  dayTitle: (date, hours, commits) => `${date}|${hours}|${commits}`,
+};
 const seven = (...vals: number[]): DayValue[] =>
   vals.map((seconds, i) => ({ date: `202606${String(11 + i).padStart(2, '0')}`, seconds }));
 
@@ -33,6 +39,12 @@ describe('renderTrend', () => {
     expect(svg).not.toContain(' h</title>'); // default tooltip fully overridden
   });
 
+  it('draws a dot without a tooltip when none is given', () => {
+    const svg = renderTrend(seven(0, 0, 0, 0, 0, 0, 7200));
+    expect(count(svg, 'class="tt-trend-dot"')).toBe(7);
+    expect(svg).not.toContain('<title>');
+  });
+
   it('with dots off draws no dots, and a fixed scale anchors a zero value to the baseline', () => {
     const svg = renderTrend(seven(0, 0, 0, 0, 0, 0, 7200), { showDots: false, scale: { min: 0, max: 7200 } });
     expect(svg).not.toContain('tt-trend-dot');
@@ -53,8 +65,8 @@ describe('renderTrend', () => {
 
 describe('renderCalendarHeatmap', () => {
   it('returns empty string for no data or all-zero data', () => {
-    expect(renderCalendarHeatmap([])).toBe('');
-    expect(renderCalendarHeatmap([{ date: '20260616', seconds: 0 }])).toBe('');
+    expect(renderCalendarHeatmap([], LABELS)).toBe('');
+    expect(renderCalendarHeatmap([{ date: '20260616', seconds: 0 }], LABELS)).toBe('');
   });
 
   it('renders one cell per day, neutral level 0 for zero days and a colored level otherwise', () => {
@@ -63,21 +75,42 @@ describe('renderCalendarHeatmap', () => {
       { date: '20260616', seconds: 3600 },
       { date: '20260617', seconds: 7200 },
     ];
-    const svg = renderCalendarHeatmap(days);
+    const svg = renderCalendarHeatmap(days, LABELS);
     expect(count(svg, 'class="tt-cell')).toBe(3);
     expect(svg).toContain('tt-l0');
     expect(svg).toMatch(/tt-l[1-4]/);
   });
 
-  it('adds the commit count to a cell tooltip, pluralized, and omits it when zero', () => {
+  it('titles each cell with its date, hours and commit count, worded by the labels', () => {
     const days: DayValue[] = [
-      { date: '20260615', seconds: 3600, commits: 0 },
+      { date: '20260615', seconds: 5400 },
       { date: '20260616', seconds: 3600, commits: 1 },
       { date: '20260617', seconds: 7200, commits: 3 },
     ];
-    const svg = renderCalendarHeatmap(days);
-    expect(svg).toContain('2026-06-15: 1.0 h</title>'); // no commits: nothing appended
-    expect(svg).toContain('2026-06-16: 1.0 h, 1 commit</title>');
-    expect(svg).toContain('2026-06-17: 2.0 h, 3 commits</title>');
+    const svg = renderCalendarHeatmap(days, LABELS);
+    expect(svg).toContain('<title>2026-06-15|1.5|0</title>'); // no commit data counts as zero
+    expect(svg).toContain('<title>2026-06-16|1|1</title>');
+    expect(svg).toContain('<title>2026-06-17|2|3</title>');
+  });
+
+  it('names the months and the Monday, Wednesday and Friday rows with the labels', () => {
+    // Monday June 29 to Sunday July 12: the month label sits on each first week of a month.
+    const days: DayValue[] = Array.from({ length: 14 }, (_, i) => {
+      const date = new Date(2026, 5, 29 + i);
+      const compact = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+      return { date: compact, seconds: 3600 };
+    });
+    const texts = [...renderCalendarHeatmap(days, LABELS).matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+    expect(texts).toEqual(['M6', 'M7', 'D1', 'D3', 'D5']);
+  });
+
+  it('escapes a label before it reaches the markup', () => {
+    const svg = renderCalendarHeatmap([{ date: '20260615', seconds: 3600 }], {
+      ...LABELS,
+      months: LABELS.months.map(() => 'a<b'),
+      dayTitle: () => 'x & y',
+    });
+    expect(svg).toContain('>a&lt;b</text>');
+    expect(svg).toContain('<title>x &amp; y</title>');
   });
 });

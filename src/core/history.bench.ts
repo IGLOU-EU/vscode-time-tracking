@@ -5,6 +5,7 @@
 // the whole view model from scratch (no cache), so this measures the realistic worst case.
 
 import { bench, describe } from 'vitest';
+import type { HeatmapLabels } from './charts';
 import { buildHistoryModel, type TaggedInterval } from './history';
 import { parseIntervals, serializeJsonl, toStoredInterval } from './jsonl';
 
@@ -39,6 +40,7 @@ function makeFixture(years: number): { tagged: TaggedInterval[]; jsonl: string; 
 }
 
 const NOW = new Date(2026, 5, 17, 18, 0, 0, 0).getTime();
+const LABELS: HeatmapLabels = { months: Array<string>(12).fill('m'), weekdays: Array<string>(7).fill('d'), dayTitle: () => 't' };
 
 // Build fixtures once so the cost is data crunching, not data generation.
 const oneYear = makeFixture(1);
@@ -60,23 +62,23 @@ describe(`history read path (${RECORDS_PER_DAY} records/day)`, () => {
 
   // Aggregate + per-window breakdown + 24h trend + 15-week heatmap from the in-memory intervals.
   bench('build history model — 1 year', () => {
-    buildHistoryModel(oneYear.tagged, oneYear.commits, NOW);
+    buildHistoryModel(oneYear.tagged, oneYear.commits, NOW, LABELS);
   });
 
   bench('build history model — 5 years', () => {
-    buildHistoryModel(fiveYears.tagged, fiveYears.commits, NOW);
+    buildHistoryModel(fiveYears.tagged, fiveYears.commits, NOW, LABELS);
   });
 
   // Post guard-rail: the build only ever sees the rendered window, so this is the real recurring
   // cost when the panel is kept open, whatever the history length behind it.
   bench('build history model — windowed (~16 weeks)', () => {
-    buildHistoryModel(windowed.tagged, windowed.commits, NOW);
+    buildHistoryModel(windowed.tagged, windowed.commits, NOW, LABELS);
   });
 
   // End to end: parse from disk then build the model, i.e. one full panel open.
   bench('full panel open (parse + build) — 5 years', () => {
     const records = parseIntervals(fiveYears.jsonl);
     const tagged = records.map((r) => ({ windowId: r.windowId, start: r.start, end: r.end }));
-    buildHistoryModel(tagged, fiveYears.commits, NOW);
+    buildHistoryModel(tagged, fiveYears.commits, NOW, LABELS);
   });
 });

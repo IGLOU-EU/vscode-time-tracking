@@ -5,7 +5,7 @@
 
 import { aggregateByDay, buildMonthlyBadges, dayKeyLocal, type DayTotal, type MonthlyBadges } from './aggregate';
 import { pad2 } from './activity';
-import { renderTrend, renderCalendarHeatmap, type DayValue } from './charts';
+import { renderTrend, renderCalendarHeatmap, type DayValue, type HeatmapLabels } from './charts';
 import { mergeIntervals, splitAtMidnight, localMidnightOf, type Interval } from './intervals';
 
 const TREND_HOURS = 24; // the trend spans the last 24 hours
@@ -288,6 +288,7 @@ export function buildHistoryModel(
   tagged: readonly TaggedInterval[],
   commitsByDay: Readonly<Record<string, number>>,
   nowMs: number,
+  heatmapLabels: HeatmapLabels,
 ): HistoryModel {
   const now = new Date(nowMs);
   const perDay = aggregateByDay(tagged.map((t) => ({ start: t.start, end: t.end })));
@@ -309,7 +310,7 @@ export function buildHistoryModel(
   return {
     days,
     trendSvg,
-    heatmapSvg: renderCalendarHeatmap(heatmapSeries(byDay, commitsByDay, nowMs, HEATMAP_WEEKS)),
+    heatmapSvg: renderCalendarHeatmap(heatmapSeries(byDay, commitsByDay, nowMs, HEATMAP_WEEKS), heatmapLabels),
     months: buildMonthlyBadges(perDay, now.getFullYear(), now.getMonth()),
   };
 }

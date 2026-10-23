@@ -2,15 +2,24 @@
 // Both render at a fixed viewBox and are stretched to 100% width by CSS (ratio preserved). The
 // trend uses a fixed plot height with the Y axis scaled to the min..max of the window, so a 0h
 // and a 21h day never blow the height up. Colors are CSS classes (theme accent), never inline.
+// Every word comes from the caller, so the core holds no language.
 
 export interface DayValue {
   readonly date: string; // YYYYMMDD
   readonly seconds: number;
-  /** My commits that day. Shown in the heatmap tooltip when present and nonzero. */
+  /** My commits that day, given to the heatmap tooltip. Absent counts as zero. */
   readonly commits?: number;
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** The words of the heatmap, in the display language. */
+export interface HeatmapLabels {
+  /** Short month names, January first. */
+  readonly months: readonly string[];
+  /** Short weekday names, Monday first. Only Monday, Wednesday and Friday are drawn. */
+  readonly weekdays: readonly string[];
+  /** Tooltip of a day cell, from its YYYY-MM-DD date, its hours, and its commit count. */
+  readonly dayTitle: (isoDate: string, hours: number, commits: number) => string;
+}
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -24,9 +33,6 @@ function dateOf(compact: string): Date {
   return new Date(Number(compact.slice(0, 4)), Number(compact.slice(4, 6)) - 1, Number(compact.slice(6, 8)));
 }
 
-const hoursLabel = (seconds: number): string => (seconds / 3600).toFixed(1);
-const commitsSuffix = (commits: number | undefined): string =>
-  commits && commits > 0 ? `, ${commits} commit${commits > 1 ? 's' : ''}` : '';
 const dayNumber = (compact: string): string => String(Number(compact.slice(6, 8)));
 const allZero = (series: readonly DayValue[]): boolean => series.every((d) => d.seconds === 0);
 
@@ -63,7 +69,7 @@ const TREND = { width: 300, height: 130, padX: 10, top: 12, baseline: 104, label
 export interface TrendOptions {
   /** X-axis label for point i. Return '' to omit the label (e.g. thin out a dense hourly axis). */
   readonly labelOf?: (d: DayValue, i: number) => string;
-  /** Tooltip text for point i (only emitted when dots are shown). */
+  /** Tooltip text for point i, drawn with the dots only. Without it a dot has no tooltip. */
   readonly titleOf?: (d: DayValue, i: number) => string;
   /** Draw a dot (with its tooltip) per point. Off for dense curves (e.g. a 24h density curve). */
   readonly showDots?: boolean;
@@ -76,7 +82,7 @@ export function renderTrend(series: readonly DayValue[], opts: TrendOptions = {}
   if (series.length === 0 || allZero(series)) return ''; // empty state handled by the webview
 
   const labelOf = opts.labelOf ?? ((d: DayValue): string => dayNumber(d.date));
-  const titleOf = opts.titleOf ?? ((d: DayValue): string => `${iso(d.date)}: ${hoursLabel(d.seconds)} h`);
+  const titleOf = opts.titleOf;
   const showDots = opts.showDots ?? true;
 
   const { width, height, padX, top, baseline, labelY, yMarginRatio } = TREND;
@@ -110,7 +116,7 @@ export function renderTrend(series: readonly DayValue[], opts: TrendOptions = {}
         .map(
           (d, i) =>
             `<circle class="tt-trend-dot" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.seconds).toFixed(1)}" r="2.5">` +
-            `<title>${esc(titleOf(d, i))}</title></circle>`,
+            `${titleOf ? `<title>${esc(titleOf(d, i))}</title>` : ''}</circle>`,
         )
         .join('')
     : '';
@@ -159,7 +165,7 @@ function bucketLevels(series: readonly DayValue[]): (seconds: number) => number 
 }
 
 /** Calendar heatmap. `series` is a continuous, Monday-aligned, zero-filled day window. */
-export function renderCalendarHeatmap(series: readonly DayValue[]): string {
+export function renderCalendarHeatmap(series: readonly DayValue[], labels: HeatmapLabels): string {
   if (series.length === 0 || allZero(series)) return ''; // empty state handled by the webview
 
   const step = HM.cell + HM.gap;
@@ -180,21 +186,17 @@ export function renderCalendarHeatmap(series: readonly DayValue[]): string {
     const y = HM.topBand + row * step;
     cells.push(
       `<rect class="tt-cell tt-l${level(d.seconds)}" x="${x}" y="${y}" width="${HM.cell}" height="${HM.cell}" rx="2">` +
-        `<title>${esc(iso(d.date))}: ${hoursLabel(d.seconds)} h${commitsSuffix(d.commits)}</title></rect>`,
+        `<title>${esc(labels.dayTitle(iso(d.date), d.seconds / 3600, d.commits ?? 0))}</title></rect>`,
     );
     const month = date.getMonth();
     if (month !== lastMonth && row === 0) {
-      months.push(`<text class="tt-axis-label" x="${x}" y="10">${MONTHS[month]}</text>`);
+      months.push(`<text class="tt-axis-label" x="${x}" y="10">${esc(labels.months[month])}</text>`);
       lastMonth = month;
     }
   });
 
-  const dayLabels = [
-    [0, 'Mon'],
-    [2, 'Wed'],
-    [4, 'Fri'],
-  ]
-    .map(([r, t]) => `<text class="tt-axis-label" x="0" y="${HM.topBand + (r as number) * step + 9}">${t}</text>`)
+  const dayLabels = [0, 2, 4] // Monday, Wednesday, Friday
+    .map((r) => `<text class="tt-axis-label" x="0" y="${HM.topBand + r * step + 9}">${esc(labels.weekdays[r])}</text>`)
     .join('');
 
   const width = HM.labelLeft + (maxCol + 1) * step - HM.gap + 2;

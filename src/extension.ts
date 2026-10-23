@@ -10,6 +10,7 @@ import { projectIdFromFsPath } from './core/project';
 import { createPendingWrites } from './core/pending-writes';
 import { aggregateByDay, buildMonthsOverview, dayKeyLocal } from './core/aggregate';
 import type { Settings } from './core/settings';
+import type { HeatmapLabels } from './core/charts';
 
 import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
@@ -377,7 +378,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       commits = await commitCounts.byDay(currentFolder, config.gitUserEmail, sinceMs).catch(() => ({}));
     }
 
-    const model = buildHistoryModel(tagged, commits, now.getTime());
+    const model = buildHistoryModel(tagged, commits, now.getTime(), heatmapLabels());
 
     const pct = model.months.previousVariationPct;
     const rounded = pct === null ? 0 : Math.round(pct);
@@ -479,6 +480,26 @@ function dayLabel(compact: string): string {
   const date = new Date(Number(compact.slice(0, 4)), Number(compact.slice(4, 6)) - 1, Number(compact.slice(6, 8)));
   // Localized short date, e.g. "Jun 16" or "16 juin", via the editor display language.
   return new Intl.DateTimeFormat(vscode.env.language, { month: 'short', day: 'numeric' }).format(date);
+}
+
+// The heatmap words in the editor display language. Month and weekday names come from Intl, like
+// the day list dates, so every display language gets them without a translation of its own.
+function heatmapLabels(): HeatmapLabels {
+  const language = vscode.env.language;
+  const month = new Intl.DateTimeFormat(language, { month: 'short' });
+  const weekday = new Intl.DateTimeFormat(language, { weekday: 'short' });
+  const decimal = new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return {
+    months: Array.from({ length: 12 }, (_, m) => month.format(new Date(2026, m, 1))),
+    weekdays: Array.from({ length: 7 }, (_, d) => weekday.format(new Date(2026, 0, 5 + d))), // January 5, 2026 is a Monday
+    dayTitle: (date, hours, commits) => {
+      const args = { date, hours: decimal.format(hours), count: commits };
+      if (commits === 0) return vscode.l10n.t('{date}: {hours} h', args);
+      return commits === 1
+        ? vscode.l10n.t('{date}: {hours} h, {count} commit', args)
+        : vscode.l10n.t('{date}: {hours} h, {count} commits', args);
+    },
+  };
 }
 
 function historyStrings(): Record<string, string> {

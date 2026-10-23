@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The History calendar now names its months and weekdays in the editor's display language, and its day tooltips write the hours and the commit count in that language too. They were always in English.
 - In a multi-root workspace, the settings a folder sets in its own `.vscode/settings.json` now apply while you work in that folder, and moving to a file of another folder switches to that folder's settings. They used to be ignored, so a `projectName` set for one folder never reached its exports.
 - A setting written by hand with the wrong type no longer breaks tracking. A word in `inactivityThresholdMinutes` disabled the focus safety cap, so a forgotten window kept counting, and closed the session as soon as the window lost focus. A project name that is not text, or a list written as a single text, kept the extension from starting. Such a value is now replaced by the default, and a number outside its range is brought back to its nearest limit.
 - Closing a window no longer risks losing the session it was tracking. The session was saved without waiting while its crash-recovery copy was already being deleted, so an editor shutting down at that moment could lose both. The copy is now deleted only once the session is on disk, and a save that fails is written to the debug log.
