@@ -1,7 +1,7 @@
 {
   "Time Tracking": "Suivi du temps",
   "No tracking": "Pas de décompte",
-  "Tracking": "Suivi en cours",
+  "Tracking: {elapsed}": "Suivi en cours : {elapsed}",
   "Paused": "En pause",
   "Paused (idle -{minutes}m)": "En pause (idle -{minutes}m)",
   "Awaiting confirmation": "En attente de confirmation",

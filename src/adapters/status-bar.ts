@@ -32,7 +32,7 @@ export function createStatusView(): StatusView {
       item.tooltip = new vscode.MarkdownString(tooltipMarkdown);
       item.backgroundColor = undefined;
       item.color = green;
-      item.accessibilityInformation = { label: vscode.l10n.t('Tracking') + `: ${elapsed}` };
+      item.accessibilityInformation = { label: vscode.l10n.t('Tracking: {elapsed}', { elapsed }) };
     },
     showPending(label) {
       item.text = `$(watch) ${label}`;
@@ -46,7 +46,7 @@ export function createStatusView(): StatusView {
       item.tooltip = label;
       item.backgroundColor = undefined;
       item.color = orange;
-      item.accessibilityInformation = { label: `${vscode.l10n.t('Paused')}: ${label}` };
+      item.accessibilityInformation = { label }; // the label already starts with the paused state
     },
     showIdle() {
       const label = vscode.l10n.t('No tracking');
