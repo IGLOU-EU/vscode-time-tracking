@@ -14,6 +14,10 @@ export enum FileType {
   SymbolicLink = 64,
 }
 
+export const Uri = {
+  joinPath: (base: unknown, ...segments: string[]): unknown => ({ base, segments }),
+};
+
 export class ThemeColor {
   constructor(public readonly id: string) {}
 }

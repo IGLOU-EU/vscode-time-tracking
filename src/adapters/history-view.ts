@@ -206,7 +206,7 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
       `font-src ${webview.cspSource}`,
     ].join('; ');
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${vscode.env.language}">
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
