@@ -18,8 +18,8 @@ export interface ExportRequest {
   path: string;
 }
 
-/** The messages with no field: page loaded, and the clicks the host answers. */
-const SIGNALS = ['ready', 'refresh', 'openSettings', 'openExport', 'openMonths'] as const;
+/** The messages with no field: page loaded, and the click the host answers. */
+const SIGNALS = ['ready', 'openMonths'] as const;
 
 export type FromPage =
   | { type: (typeof SIGNALS)[number] }

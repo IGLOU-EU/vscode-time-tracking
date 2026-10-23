@@ -4,7 +4,7 @@ import { fromPage } from './page-message';
 const entry = { reason: 'Meeting', date: '2026-10-20', start: '09:00', end: '10:30' };
 
 describe('fromPage', () => {
-  it.each(['ready', 'refresh', 'openSettings', 'openExport', 'openMonths'])('reads the %s signal', (type) => {
+  it.each(['ready', 'openMonths'])('reads the %s signal', (type) => {
     expect(fromPage({ type })).toEqual({ type });
   });
 
@@ -25,7 +25,7 @@ describe('fromPage', () => {
   });
 
   it('keeps only the fields of the message type', () => {
-    expect(fromPage({ type: 'refresh', path: '/etc/passwd' })).toEqual({ type: 'refresh' });
+    expect(fromPage({ type: 'ready', path: '/etc/passwd' })).toEqual({ type: 'ready' });
     expect(fromPage({ type: 'exportBrowse', path: 'a.csv', month: '202610' })).toEqual({
       type: 'exportBrowse',
       path: 'a.csv',

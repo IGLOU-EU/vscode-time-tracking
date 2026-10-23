@@ -1,16 +1,21 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { env, type Uri, type WebviewView } from 'vscode';
-import { HistoryViewProvider, type HistoryDataPort, type HistoryPayload } from './history-view';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { commands, env, type Uri, type WebviewView } from 'vscode';
+import { HistoryViewProvider, type ExportOpen, type HistoryDataPort, type HistoryPayload } from './history-view';
 import type { Logger } from './logger';
 
-// Only what the provider touches: the page is built, posts are recorded, and receive() plays a
-// message from the page.
+// Only what the provider touches: the page is built, posts are recorded, receive() plays a
+// message from the page, and setVisible() what the editor does on a hide or a show.
 function fakeView(visible = true) {
   const none = () => ({ dispose() {} });
   const posted: unknown[] = [];
+  let visibilityChanged = (): void => undefined;
   const view = {
     posted,
     receive: (_message: unknown): void => undefined,
+    setVisible: (next: boolean): void => {
+      view.visible = next;
+      visibilityChanged();
+    },
     visible,
     badge: undefined as unknown,
     webview: {
@@ -27,7 +32,10 @@ function fakeView(visible = true) {
         return Promise.resolve(true);
       },
     },
-    onDidChangeVisibility: none,
+    onDidChangeVisibility: (listener: () => void) => {
+      visibilityChanged = listener;
+      return { dispose() {} };
+    },
     onDidDispose: none,
   };
   return view;
@@ -79,5 +87,88 @@ describe('HistoryViewProvider', () => {
     view.receive({ type: 'exportRun', month: '202610', granularity: 'week', path: 'october.csv' });
     expect(exports).toEqual([]);
     expect(lines).toEqual([['page-message-ignored', { type: 'exportRun' }]]);
+  });
+});
+
+describe('HistoryViewProvider forms opened by a command', () => {
+  const payload = { todayHours: 0, strings: { hoursToday: '' } } as unknown as HistoryPayload;
+  const open: ExportOpen = { months: [], defaultMonth: null, defaultPath: 'timesheet.csv' };
+  const data: Partial<HistoryDataPort> = {
+    buildPayload: () => Promise.resolve(payload),
+    getExportOpen: () => Promise.resolve(open),
+  };
+  const typesPosted = (view: ReturnType<typeof fakeView>) => view.posted.map((m) => (m as { type: string }).type);
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reveals the history view first', async () => {
+    const run = vi.spyOn(commands, 'executeCommand');
+    await providerFor(fakeView(), data).showAddForm();
+    expect(run).toHaveBeenCalledWith('timeTracking.historyView.focus');
+  });
+
+  it('opens the add-time form of a page that has drawn the history', async () => {
+    const view = fakeView();
+    const provider = providerFor(view, data);
+    view.receive({ type: 'ready' });
+    await settle();
+    await provider.showAddForm();
+    expect(typesPosted(view)).toEqual(['history', 'openAddForm']);
+  });
+
+  it('opens the add-time form once the page the reveal loads has drawn the history', async () => {
+    // The reveal resolves before the new page has loaded, and a message posted then is lost. The
+    // form is built from the strings of the history, so it waits for those too.
+    const view = fakeView();
+    const provider = providerFor(view, data);
+    await provider.showAddForm();
+    expect(view.posted).toEqual([]);
+    view.receive({ type: 'ready' });
+    await settle();
+    expect(typesPosted(view)).toEqual(['history', 'openAddForm']);
+  });
+
+  it('opens the add-time form of a view the reveal shows for the first time', async () => {
+    const view = fakeView();
+    const provider = new HistoryViewProvider({} as Uri, data as HistoryDataPort, { log() {} });
+    vi.spyOn(commands, 'executeCommand').mockImplementation(() => {
+      provider.resolveWebviewView(view as unknown as WebviewView);
+      return Promise.resolve(undefined);
+    });
+    await provider.showAddForm();
+    view.receive({ type: 'ready' });
+    await settle();
+    expect(typesPosted(view)).toEqual(['history', 'openAddForm']);
+  });
+
+  it('waits for a new page once the view was hidden, as the hidden one is freed', async () => {
+    const view = fakeView();
+    const provider = providerFor(view, data);
+    view.receive({ type: 'ready' });
+    await settle();
+    view.setVisible(false);
+    view.posted.length = 0;
+    vi.spyOn(commands, 'executeCommand').mockImplementation(() => {
+      view.setVisible(true);
+      return Promise.resolve(undefined);
+    });
+    await provider.showAddForm();
+    await settle();
+    expect(typesPosted(view)).toEqual(['history']);
+    view.receive({ type: 'ready' });
+    await settle();
+    expect(typesPosted(view)).toEqual(['history', 'history', 'openAddForm']);
+  });
+
+  it('opens the export form once the page the reveal loads has drawn the history', async () => {
+    const view = fakeView();
+    const provider = providerFor(view, data);
+    await provider.showExportForm();
+    view.receive({ type: 'ready' });
+    await settle();
+    expect(view.posted.slice(1)).toEqual([{ type: 'exportOpen', ...open }]);
   });
 });

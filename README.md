@@ -48,7 +48,9 @@ stepping away).
   calendar heatmap (hover a day for its hours and commit count), your git
   commits per day, monthly totals with variation, and a per-window
   breakdown. Click last month's total to see the project's total and
-  every month's.
+  every month's. Its title bar holds Add Time, Export Timesheet, Refresh
+  History and Open Settings, also found in the Command Palette under
+  Time Tracking, so each can be bound to a key.
 - Manual time entries: add time by hand from the History panel, with a reason picked from your presets or typed freely.
 - Timesheet export: export a month to CSV from the History panel, one row per session or per day, with your own columns, separator and date format.
 - Data stored locally only.

@@ -47,6 +47,15 @@ export interface ExportOpen {
   defaultPath: string;
 }
 
+/** What the host posts to the page: the data it draws, the replies to its forms, and the form a command opens. */
+type ToPage =
+  | { type: 'history'; payload: HistoryPayload }
+  | { type: 'months'; payload: MonthsPayload }
+  | { type: 'entrySaved' | 'entryError' | 'exportDone' | 'exportError'; message: string | null }
+  | ({ type: 'exportOpen' } & ExportOpen)
+  | { type: 'exportPath'; path: string }
+  | { type: 'openAddForm' };
+
 export interface HistoryDataPort {
   buildPayload(): Promise<HistoryPayload>;
   /** Totals over the whole history, read only when the months page asks for them. */
@@ -65,6 +74,12 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'timeTracking.historyView'; // must match contributes.views id
 
   private view: vscode.WebviewView | undefined;
+  // The page of the view has said ready and been sent the history its forms are built from. A
+  // hidden view frees its page, so this holds until the view is hidden, reloaded or disposed.
+  private pageReady = false;
+  // What a command asked of a page not ready yet, run once it is. The last one wins, as the page
+  // shows a single form at a time.
+  private queued: (() => void) | undefined;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -74,6 +89,7 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
+    this.pageReady = false;
     const media = vscode.Uri.joinPath(this.extensionUri, 'media');
     view.webview.options = { enableScripts: true, localResourceRoots: [media] };
     view.webview.html = this.html(view.webview);
@@ -86,8 +102,13 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
         this.logger.log('page-message-ignored', { type: typeof type === 'string' ? type : typeof type });
         return;
       }
-      if (msg.type === 'ready' || msg.type === 'refresh') {
-        void this.refresh();
+      if (msg.type === 'ready') {
+        this.pageReady = false; // a reloaded page has drawn nothing yet
+        void this.refresh().finally(() => {
+          if (this.view !== view) return;
+          this.pageReady = true;
+          this.runQueued();
+        });
         return;
       }
       if (msg.type === 'submitEntry') {
@@ -96,28 +117,12 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
           .submitManualEntry({ reason, date, start, end })
           .then((error) => {
             // Tell the form to show the error and stay open, or to close on success.
-            void this.view?.webview.postMessage({ type: error ? 'entryError' : 'entrySaved', message: error });
+            this.post({ type: error ? 'entryError' : 'entrySaved', message: error });
           })
           .catch((e: unknown) => {
             // A rejected save (disk full, read-only storage) must not leave the button disabled.
             const message = vscode.l10n.t('Saving failed: {error}', { error: errorText(e) });
-            void this.view?.webview.postMessage({ type: 'entryError', message });
-          });
-        return;
-      }
-      if (msg.type === 'openSettings') {
-        void vscode.commands.executeCommand('workbench.action.openSettings', 'timeTracking');
-        return;
-      }
-      if (msg.type === 'openExport') {
-        void this.data
-          .getExportOpen()
-          .then((open) => {
-            void this.view?.webview.postMessage({ type: 'exportOpen', ...open });
-          })
-          .catch((e: unknown) => {
-            // The modal only opens on the reply, so a silent rejection would make the click do nothing.
-            void vscode.window.showErrorMessage(vscode.l10n.t('Could not open the export form: {error}', { error: errorText(e) }));
+            this.post({ type: 'entryError', message });
           });
         return;
       }
@@ -125,7 +130,7 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
         void this.data
           .buildMonths()
           .then((payload) => {
-            void this.view?.webview.postMessage({ type: 'months', payload });
+            this.post({ type: 'months', payload });
           })
           .catch((e: unknown) => {
             // The page only opens on the reply, so a silent rejection would make the click do nothing.
@@ -137,7 +142,7 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
         void this.data
           .browseExportPath(msg.path)
           .then((path) => {
-            if (path !== null) void this.view?.webview.postMessage({ type: 'exportPath', path });
+            if (path !== null) this.post({ type: 'exportPath', path });
           })
           .catch((e: unknown) => {
             void vscode.window.showErrorMessage(vscode.l10n.t('Could not open the save dialog: {error}', { error: errorText(e) }));
@@ -149,22 +154,34 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
         void this.data
           .runExport({ month, granularity, path })
           .then((error) => {
-            void this.view?.webview.postMessage({ type: error ? 'exportError' : 'exportDone', message: error });
+            this.post({ type: error ? 'exportError' : 'exportDone', message: error });
           })
           .catch((e: unknown) => {
             // Same contract as a returned error: show it in the form and unlock the Export button.
             const message = vscode.l10n.t('Export failed: {error}', { error: errorText(e) });
-            void this.view?.webview.postMessage({ type: 'exportError', message });
+            this.post({ type: 'exportError', message });
           });
       }
     });
     view.onDidChangeVisibility(() => {
       if (view.visible) void this.refresh();
+      else this.pageReady = false; // the page of a hidden view is freed, a new one loads when shown
     });
     view.onDidDispose(() => {
       sub.dispose();
       this.view = undefined;
+      this.pageReady = false;
     });
+  }
+
+  /** Open the add-time form, revealing the view first. */
+  showAddForm(): Promise<void> {
+    return this.reveal(() => this.post({ type: 'openAddForm' }));
+  }
+
+  /** Open the export form, revealing the view first. */
+  showExportForm(): Promise<void> {
+    return this.reveal(() => this.openExport());
   }
 
   // Push fresh data to the webview and its badge. The badge shows on the activity bar while the
@@ -175,10 +192,40 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
     if (!view) return;
     const payload = await this.data.buildPayload();
     if (this.view !== view) return; // disposed while building, and a disposed view throws
-    if (view.visible) void view.webview.postMessage({ type: 'history', payload });
+    if (view.visible) this.post({ type: 'history', payload });
     const todayHours = Math.round(payload.todayHours);
     // The template is already translated: looked up again, it would be a key no bundle holds.
     view.badge = { value: todayHours, tooltip: payload.strings.hoursToday.replaceAll('{count}', String(todayHours)) };
+  }
+
+  // A hidden view has no page, and a page only receives messages once loaded. So the view is revealed
+  // first, through the focus command the editor adds for each view (registerFocusViewAction in
+  // src/vs/workbench/browser/parts/views/viewsService.ts, release/1.82), and the action waits for
+  // the page to be ready when the reveal loaded a new one.
+  private async reveal(action: () => void): Promise<void> {
+    this.queued = action;
+    await vscode.commands.executeCommand(`${HistoryViewProvider.viewType}.focus`);
+    if (this.pageReady) this.runQueued();
+  }
+
+  private runQueued(): void {
+    const action = this.queued;
+    this.queued = undefined;
+    action?.();
+  }
+
+  private openExport(): void {
+    void this.data
+      .getExportOpen()
+      .then((open) => this.post({ type: 'exportOpen', ...open }))
+      .catch((e: unknown) => {
+        // The modal only opens on the reply, so a silent rejection would make the command do nothing.
+        void vscode.window.showErrorMessage(vscode.l10n.t('Could not open the export form: {error}', { error: errorText(e) }));
+      });
+  }
+
+  private post(message: ToPage): void {
+    void this.view?.webview.postMessage(message);
   }
 
   private html(webview: vscode.Webview): string {

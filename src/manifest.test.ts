@@ -4,6 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { NUMBER_BOUNDS, normalizeSettings, type SettingReader } from './core/settings';
 import { EXPORT_DATE_FORMATS } from './core/timesheet';
 
+interface MenuItem {
+  command: string;
+  when?: string;
+}
+
 interface ContributedSetting {
   type: string;
   default: unknown;
@@ -16,7 +21,12 @@ const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
   engines: { vscode: string };
   scripts: Record<string, string>;
   devDependencies: Record<string, string>;
-  contributes: { configuration: { properties: Record<string, ContributedSetting> } };
+  contributes: {
+    commands: { command: string; icon?: string }[];
+    menus: Record<string, MenuItem[]>;
+    views: Record<string, { id: string }[]>;
+    configuration: { properties: Record<string, ContributedSetting> };
+  };
 };
 const floor = manifest.engines.vscode.replace(/^\^/, '');
 
@@ -54,6 +64,34 @@ describe('F5 launch configuration', () => {
     const args = runExtension()?.args ?? [];
     expect(args).toContain('--disable-extensions');
     expect(args.some((a) => a.startsWith('--user-data-dir='))).toBe(true);
+  });
+});
+
+describe('contributed menus', () => {
+  const { commands, menus, views } = manifest.contributes;
+  const items = Object.values(menus).flat();
+  const viewIds = Object.values(views)
+    .flat()
+    .map((v) => v.id);
+
+  it('cites only contributed commands', () => {
+    const contributed = commands.map((c) => c.command);
+    expect(items.map((i) => i.command).filter((id) => !contributed.includes(id))).toEqual([]);
+  });
+
+  it('shows a menu item only on a contributed view', () => {
+    // A view id misspelt in a when clause hides its item without any error.
+    const named = items.flatMap((i) => [...(i.when ?? '').matchAll(/\bview(?: == |\.)([\w.]+?)(?:\.visible\b|$|\s)/g)].map((m) => m[1]));
+    expect(named.length).toBeGreaterThan(0);
+    expect(named.filter((id) => !viewIds.includes(id))).toEqual([]);
+  });
+
+  it('gives each title bar action of a view an icon', () => {
+    // Without one, the title bar shows the action as text.
+    const withoutIcon = menus['view/title']
+      .map((i) => i.command)
+      .filter((id) => !/^\$\([a-z-]+\)$/.test(commands.find((c) => c.command === id)?.icon ?? ''));
+    expect(withoutIcon).toEqual([]);
   });
 });
 

@@ -106,29 +106,16 @@
       ? `<section class="tt-section"><h2>${esc(s.days || 'Days')}</h2><ul class="tt-days">${dayRows}</ul></section>`
       : `<p class="tt-empty">${esc(s.empty || 'No tracking data yet.')}</p>`;
 
+    // The actions live in the view's title bar, as commands: the host opens the forms on request.
     app.innerHTML =
       `<div class="tt-header">` +
       `<h1>${esc(s.history || 'History')}</h1>` +
-      `<div class="tt-actions">` +
-      `<button id="tt-add" title="${esc(s.addEntry || 'Add time')}"><i class="codicon codicon-add"></i></button>` +
-      `<button id="tt-export" title="${esc(s.exportTitle || 'Export timesheet')}"><i class="codicon codicon-export"></i></button>` +
-      `<button id="tt-refresh" title="${esc(s.refresh || 'Refresh')}"><i class="codicon codicon-refresh"></i></button>` +
-      `<button id="tt-settings" title="${esc(s.openSettings || 'Open settings')}"><i class="codicon codicon-settings-gear"></i></button>` +
-      `</div>` +
       `</div>` +
       badges +
       trend +
       heatmap +
       dayList;
 
-    const refresh = document.getElementById('tt-refresh');
-    if (refresh) refresh.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
-    const add = document.getElementById('tt-add');
-    if (add) add.addEventListener('click', openAddForm);
-    const exportBtn = document.getElementById('tt-export');
-    if (exportBtn) exportBtn.addEventListener('click', () => vscode.postMessage({ type: 'openExport' }));
-    const settings = document.getElementById('tt-settings');
-    if (settings) settings.addEventListener('click', () => vscode.postMessage({ type: 'openSettings' }));
     const months = document.getElementById('tt-months');
     if (months) {
       months.addEventListener('click', () => vscode.postMessage({ type: 'openMonths' }));
@@ -449,7 +436,8 @@
     } else if (message.type === 'months') {
       monthsShown = true;
       renderMonths(message.payload);
-    } else if (message.type === 'entryError') showFormError(message.message);
+    } else if (message.type === 'openAddForm') openAddForm();
+    else if (message.type === 'entryError') showFormError(message.message);
     else if (message.type === 'entrySaved') closeModal();
     else if (message.type === 'exportOpen') openExportForm(message);
     else if (message.type === 'exportPath') {

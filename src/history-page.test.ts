@@ -6,8 +6,13 @@ import { describe, expect, it } from 'vitest';
 
 const PAGE = readFileSync('media/history.js', 'utf8');
 
-// The page run against the few DOM calls it makes to draw the day list: it is enough to read the
-// markup it writes and to click a day, without a DOM library.
+// A field of a modal: the page only wires it, focuses it and reads its value.
+function field() {
+  return { value: '', addEventListener: () => undefined, focus: () => undefined, classList: { toggle: () => true, add: () => undefined } };
+}
+
+// The page run against the few DOM calls it makes to draw the day list and open a modal: it is
+// enough to read the markup it writes and to click a day, without a DOM library.
 function loadPage(state?: unknown) {
   let saved = state;
   let onMessage = (_event: { data: unknown }): void => undefined;
@@ -25,17 +30,34 @@ function loadPage(state?: unknown) {
         };
       }),
   };
+  // The modal the page appended to the body, whose fields are looked up by the ids of its markup.
+  const modals: { innerHTML: string; addEventListener: () => void }[] = [];
+  const fields = new Map<string, ReturnType<typeof field>>();
+  const byId = (id: string) => {
+    if (id === 'app') return app;
+    if (!modals.some((m) => m.innerHTML.includes(`id="${id}"`))) return null;
+    if (!fields.has(id)) fields.set(id, field());
+    return fields.get(id);
+  };
   runInNewContext(PAGE, {
     acquireVsCodeApi: () => ({
       postMessage: () => undefined,
       getState: () => saved,
       setState: (next: unknown) => (saved = next),
     }),
-    document: { getElementById: (id: string) => (id === 'app' ? app : null), body: { style: {} } },
+    document: {
+      getElementById: byId,
+      createElement: () => ({ innerHTML: '', addEventListener: () => undefined }),
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      body: { style: {}, appendChild: (modal: (typeof modals)[number]) => modals.push(modal) },
+    },
     window: { addEventListener: (type: string, listener: typeof onMessage) => type === 'message' && (onMessage = listener) },
   });
   return {
     show: (...dates: string[]) => onMessage({ data: { type: 'history', payload: { strings: {}, days: dates.map(day) } } }),
+    receive: (message: unknown) => onMessage({ data: message }),
+    modals: () => modals.map((m) => m.innerHTML),
     click: (date: string) => clicks.get(date)?.(),
     expanded: () => [...app.innerHTML.matchAll(/<li class="[^"]*\btt-expanded\b[^"]*" data-date="(\d+)">/g)].map((m) => m[1]),
     state: () => saved,
@@ -87,6 +109,14 @@ describe('history.js', () => {
     const page = loadPage(state);
     page.show('20261020');
     expect(page.expanded()).toEqual([]);
+  });
+
+  it('opens the add-time form when the host asks for it', () => {
+    // The view's title bar action runs a command, which asks the page for its form.
+    const page = loadPage();
+    page.show('20261021');
+    page.receive({ type: 'openAddForm' });
+    expect(page.modals()).toEqual([expect.stringContaining('<form class="tt-modal" id="tt-form">')]);
   });
 });
 

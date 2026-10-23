@@ -31,6 +31,11 @@ export const window = {
   createStatusBarItem: (): Record<string, unknown> => ({ show() {}, dispose() {} }),
 };
 
+// A spec replaces executeCommand to play what the editor does in answer, such as revealing a view.
+export const commands = {
+  executeCommand: (_command: string, ..._args: unknown[]): Promise<unknown> => Promise.resolve(undefined),
+};
+
 // A spec sets 'fr' to read the adapter in French, as the editor does with its display language.
 export const env = {
   language: 'en',

@@ -81,8 +81,62 @@
         "command": "timeTracking.showLog",
         "title": "%cmd.showLog%",
         "category": "%cmd.category%"
+      },
+      {
+        "command": "timeTracking.addTime",
+        "title": "%cmd.addTime%",
+        "category": "%cmd.category%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "timeTracking.exportTimesheet",
+        "title": "%cmd.exportTimesheet%",
+        "category": "%cmd.category%",
+        "icon": "$(export)"
+      },
+      {
+        "command": "timeTracking.refreshHistory",
+        "title": "%cmd.refreshHistory%",
+        "category": "%cmd.category%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "timeTracking.openSettings",
+        "title": "%cmd.openSettings%",
+        "category": "%cmd.category%",
+        "icon": "$(settings-gear)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "timeTracking.addTime",
+          "when": "view == timeTracking.historyView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "timeTracking.exportTimesheet",
+          "when": "view == timeTracking.historyView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "timeTracking.refreshHistory",
+          "when": "view == timeTracking.historyView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "timeTracking.openSettings",
+          "when": "view == timeTracking.historyView",
+          "group": "navigation@4"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "timeTracking.refreshHistory",
+          "when": "view.timeTracking.historyView.visible"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {

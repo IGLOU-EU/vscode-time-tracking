@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Clicking last month's total in the History panel opens a page with the project's total tracked time and the total of every month worked.
+- The add time, export, refresh and settings buttons of the History panel are now commands, shown in the view's title bar like the actions of the built-in views. They are also in the Command Palette under Time Tracking, so each can be bound to a key. Run from there, Add Time and Export Timesheet open the view, then their form.
 
 ### Changed
 

@@ -21,8 +21,18 @@ suite('Time Tracking extension', () => {
       'timeTracking.pause',
       'timeTracking.resume',
       'timeTracking.ignoreSession',
+      'timeTracking.addTime',
+      'timeTracking.exportTimesheet',
+      'timeTracking.refreshHistory',
+      'timeTracking.openSettings',
     ]) {
       assert.ok(commands.includes(id), `missing command: ${id}`);
     }
+  });
+
+  test('reveals the history view to open a form from the command palette', async () => {
+    // The command goes through the focus command of the view, which the editor names after its id.
+    await vscode.extensions.getExtension(EXTENSION_ID)?.activate();
+    await vscode.commands.executeCommand('timeTracking.addTime');
   });
 });

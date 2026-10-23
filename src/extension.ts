@@ -296,6 +296,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       refreshHistory();
     }),
     vscode.commands.registerCommand('timeTracking.showLog', () => logger.show()),
+    // The actions of the History view's title bar.
+    vscode.commands.registerCommand('timeTracking.addTime', () => historyProvider.showAddForm()),
+    vscode.commands.registerCommand('timeTracking.exportTimesheet', () => historyProvider.showExportForm()),
+    vscode.commands.registerCommand('timeTracking.refreshHistory', () => historyProvider.refresh()),
+    vscode.commands.registerCommand('timeTracking.openSettings', () =>
+      vscode.commands.executeCommand('workbench.action.openSettings', 'timeTracking'),
+    ),
   );
 
   // React to settings changes without a reload.
@@ -486,9 +493,7 @@ function dayLabel(compact: string): string {
 function historyStrings(): Record<string, string> {
   return {
     history: vscode.l10n.t('History'),
-    refresh: vscode.l10n.t('Refresh'),
     addEntry: vscode.l10n.t('Add time'),
-    openSettings: vscode.l10n.t('Open settings'),
     formReason: vscode.l10n.t('Reason'),
     formDate: vscode.l10n.t('Date'),
     formStart: vscode.l10n.t('Start'),
