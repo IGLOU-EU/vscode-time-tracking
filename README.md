@@ -88,12 +88,7 @@ tracking) to start tracking immediately. Tracking also resumes on its
 own at the next real action. The `Ignore Current Session` command throws
 the open session away instead of saving it.
 
-**Per-project settings.** Every setting can be overridden for a single
-project. Open the settings (`Ctrl+,`), switch to the **Workspace** tab,
-and edit the value there, or write it straight into the project's
-`.vscode/settings.json`. This matters most for `projectName` (the name
-written to exports) and `exportColumns` (when a client expects a given
-layout).
+**Per-project settings.** Every setting can be overridden for a single project. Open the settings (`Ctrl+,`), switch to the **Workspace** tab, and edit the value there, or write it straight into the project's `.vscode/settings.json`. In a multi-root workspace, each folder can also carry its own values in its `.vscode/settings.json`, which apply while you work in a file of that folder. This matters most for `projectName` (the name written to exports) and `exportColumns` (when a client expects a given layout).
 
 **Settings.** All of them live under the `timeTracking.` prefix.
 

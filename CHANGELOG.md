@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- In a multi-root workspace, the settings a folder sets in its own `.vscode/settings.json` now apply while you work in that folder, and moving to a file of another folder switches to that folder's settings. They used to be ignored, so a `projectName` set for one folder never reached its exports.
 - Closing a window no longer risks losing the session it was tracking. The session was saved without waiting while its crash-recovery copy was already being deleted, so an editor shutting down at that moment could lose both. The copy is now deleted only once the session is on disk, and a save that fails is written to the debug log.
 
 ### Tooling
@@ -22,6 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The CI builds the extension bundle on every push, as the local checks already require.
 - The editor API types are pinned to the minimum supported VSCode version, so a call to a newer API fails the type check instead of breaking on older editors.
 - The integration tests also run on the minimum supported VSCode version, and a unit test keeps the API types and the README on that version.
+- The integration tests also run in a multi-root workspace, where each folder carries its own settings.
 - The development Node version in `engines.node` now matches what the build tools require, and npm refuses to install on another one. The extension bundle targets the Node of the oldest supported editor instead.
 - `F5` works from a fresh clone: it compiles the extension and runs it on the sample workspace, in a development host with its own profile and the other extensions disabled.
 

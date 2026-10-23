@@ -9,8 +9,6 @@ const here = import.meta.dirname;
 const floor = JSON.parse(readFileSync(path.join(here, 'package.json'), 'utf8')).engines.vscode.replace(/^\^/, '');
 
 const shared = {
-  files: 'out/test/**/*.test.js',
-  workspaceFolder: './test-fixtures/sample-workspace',
   mocha: { ui: 'tdd', timeout: 20000, color: true },
   launchArgs: [
     '--disable-extensions',
@@ -20,8 +18,17 @@ const shared = {
   // To prove VSCodium compatibility in CI, point to a local binary:
   // useInstallation: { fromPath: process.env.VSCODIUM_PATH },
 };
+const singleFolder = { ...shared, files: 'out/test/*.test.js', workspaceFolder: './test-fixtures/sample-workspace' };
+// Folder settings behave differently once a window holds several folders, so they get their own window.
+const multiRoot = {
+  ...shared,
+  files: 'out/test/multi-root/*.test.js',
+  workspaceFolder: './test-fixtures/multi-root/multi-root.code-workspace',
+};
 
 export default defineConfig([
-  { label: 'integration', version: 'stable', ...shared },
-  { label: 'floor', version: floor, ...shared },
+  { label: 'integration', version: 'stable', ...singleFolder },
+  { label: 'integration-multi-root', version: 'stable', ...multiRoot },
+  { label: 'floor', version: floor, ...singleFolder },
+  { label: 'floor-multi-root', version: floor, ...multiRoot },
 ]);

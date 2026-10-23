@@ -10,7 +10,7 @@ import { projectIdFromFsPath } from './core/project';
 import { createPendingWrites } from './core/pending-writes';
 import { aggregateByDay, buildMonthsOverview, dayKeyLocal } from './core/aggregate';
 
-import { readConfig, onConfigChange } from './adapters/config';
+import { readConfig, onConfigChange, type TimeTrackingConfig } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
 import { StorageAdapter } from './adapters/storage';
 import { registerSignals } from './adapters/signals';
@@ -33,24 +33,10 @@ let onDeactivate: (() => Promise<void>) | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const windowId = randomUUID();
-  const config = readConfig();
-  let gitEmail = config.gitUserEmail;
-  let fontSizePx = config.fontSizePx;
-  let manualReasons = config.manualReasons;
-  let projectName = config.projectName;
-  let exportColumns = config.exportColumns;
-  let exportSeparator = config.exportSeparator;
-  let exportDateFormat = config.exportDateFormat;
-  let defaultReason = config.defaultReason;
-  let minSessionMs = config.minSessionMs; // also applies to a session recovered from a crash marker
-
-  const tracker: Tracker = createTracker({
-    idleThresholdMs: config.idleThresholdMs,
-    backgroundTimeoutMs: config.backgroundTimeoutMs,
-    focusCapMs: config.focusCapMs,
-    debugIdleCapMs: config.debugIdleCapMs,
-    minSessionMs: config.minSessionMs,
-  });
+  // The settings in force for the tracked folder, read again on a project switch: each folder of a
+  // multi-root workspace can override them.
+  let config = readConfig(activeFolderUri());
+  const tracker: Tracker = createTracker(config);
 
   const storage = new StorageAdapter(context.globalStorageUri, windowId);
   const status = createStatusView();
@@ -74,11 +60,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     getProjectId: () => currentProjectId,
     getFolderPath: () => currentFolder?.fsPath,
     getSettings: () => ({
-      projectName,
-      columns: exportColumns,
-      separator: exportSeparator,
-      dateFormat: exportDateFormat,
-      defaultReason,
+      projectName: config.projectName,
+      columns: config.exportColumns,
+      separator: config.exportSeparator,
+      dateFormat: config.exportDateFormat,
+      defaultReason: config.defaultReason,
     }),
   });
 
@@ -144,16 +130,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     status.showIdle();
   }
 
+  function applyConfig(next: TimeTrackingConfig): void {
+    config = next;
+    tracker.setConfig(next);
+    logger.setEnabled(next.debugLogging);
+  }
+
   // Attribute time to the folder of the active file. On a real folder change, flush the open
   // interval (committed under the OLD project) before switching, then watch the new project.
   async function setProject(folderUri: vscode.Uri): Promise<void> {
     const id = projectIdFromFsPath(folderUri.fsPath);
     if (id === currentProjectId) return;
-    tracker.flush(Date.now()); // emits under the still-current (old) project id
+    tracker.flush(Date.now()); // emits under the still-current (old) project id, with its settings
     currentProjectId = id;
     currentFolder = folderUri;
+    applyConfig(readConfig(folderUri));
     await storage.ensureDir(id);
-    await storage.recoverOrphanMarkers(id, Date.now(), RECOVERY_STALE_MS, minSessionMs);
+    await storage.recoverOrphanMarkers(id, Date.now(), RECOVERY_STALE_MS, config.minSessionMs);
     watcher?.dispose();
     watcher = storage.watch(id, refreshHistory);
     refreshStatus(Date.now());
@@ -304,24 +297,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // React to settings changes without a reload.
   context.subscriptions.push(
-    onConfigChange((cfg) => {
-      tracker.setConfig({
-        idleThresholdMs: cfg.idleThresholdMs,
-        backgroundTimeoutMs: cfg.backgroundTimeoutMs,
-        focusCapMs: cfg.focusCapMs,
-        debugIdleCapMs: cfg.debugIdleCapMs,
-        minSessionMs: cfg.minSessionMs,
-      });
-      gitEmail = cfg.gitUserEmail;
-      fontSizePx = cfg.fontSizePx;
-      manualReasons = cfg.manualReasons;
-      projectName = cfg.projectName;
-      exportColumns = cfg.exportColumns;
-      exportSeparator = cfg.exportSeparator;
-      exportDateFormat = cfg.exportDateFormat;
-      defaultReason = cfg.defaultReason;
-      minSessionMs = cfg.minSessionMs;
-      logger.setEnabled(cfg.debugLogging);
+    onConfigChange(() => {
+      applyConfig(readConfig(currentFolder));
       commitCounts?.clear(); // the configured email feeds the counts; git state won't signal its change
       refreshHistory();
     }),
@@ -384,9 +361,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         months: { currentLabel: formatClock(0), previousLabel: formatClock(0), variationText: '', variationDir: 'na' },
         days: [],
         strings,
-        manualReasons: [...manualReasons],
+        manualReasons: [...config.manualReasons],
         todayHours: 0,
-        fontSizePx,
+        fontSizePx: config.fontSizePx,
       };
     }
 
@@ -396,7 +373,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const tagged = await storage.readAllTagged(currentProjectId, { sinceMs });
     let commits: Record<string, number> = {};
     if (commitCounts && currentFolder) {
-      commits = await commitCounts.byDay(currentFolder, gitEmail, sinceMs).catch(() => ({}));
+      commits = await commitCounts.byDay(currentFolder, config.gitUserEmail, sinceMs).catch(() => ({}));
     }
 
     const model = buildHistoryModel(tagged, commits, now.getTime());
@@ -442,9 +419,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               : undefined,
         })),
       strings,
-      manualReasons: [...manualReasons],
+      manualReasons: [...config.manualReasons],
       todayHours: today ? today.seconds / 3600 : 0,
-      fontSizePx,
+      fontSizePx: config.fontSizePx,
     };
   }
 

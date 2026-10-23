@@ -30,8 +30,13 @@ function parseColumns(entries: readonly string[]): ExportColumn[] {
   });
 }
 
-export function readConfig(): TimeTrackingConfig {
-  const c = vscode.workspace.getConfiguration('timeTracking');
+// In a multi-root workspace, a folder's own settings (scopes resource and machine-overridable) apply
+// only to a read that names that folder. Outside any folder, null asks for the value of no particular
+// resource, which an unscoped read of a resource setting would log as unexpected.
+// https://code.visualstudio.com/api/references/contribution-points#contributes.configuration
+// (scopes) and src/vs/workbench/api/common/extHostConfiguration.ts (release/1.82, the null scope).
+export function readConfig(folder: vscode.Uri | undefined): TimeTrackingConfig {
+  const c = vscode.workspace.getConfiguration('timeTracking', folder ?? null);
   const idleThresholdMs = c.get<number>('inactivityThresholdMinutes', 30) * 60_000;
   // The focus cap doubles as the unfocused idle cap and must outlast the out-grace, so the grace
   // window is well-formed. 0 keeps its "disabled" meaning, any positive value is raised to the
@@ -63,9 +68,9 @@ function readDateFormat(value: string): ExportDateFormat {
   return (DATE_FORMATS as readonly string[]).includes(value) ? (value as ExportDateFormat) : 'iso8601';
 }
 
-export function onConfigChange(callback: (config: TimeTrackingConfig) => void): vscode.Disposable {
+export function onConfigChange(callback: () => void): vscode.Disposable {
   return vscode.workspace.onDidChangeConfiguration((e) => {
     if (!e.affectsConfiguration('timeTracking')) return; // early return
-    callback(readConfig());
+    callback();
   });
 }
