@@ -49,6 +49,9 @@ publish:
     # Pin the manifest version to the tag so the published version always matches the tag.
     - npm version "$VERSION" --no-git-tag-version --allow-same-version
     - npx @vscode/vsce package -o "time-tracking-$VERSION.vsix"
+    # Every file the package holds, in the job log: the proof of what ships. It lists the disk
+    # through .vscodeignore, so it runs once the package step has built the bundle.
+    - npx @vscode/vsce ls
     - npx ovsx publish "time-tracking-$VERSION.vsix" -p "$OVSX_TOKEN"
   artifacts:
     paths:

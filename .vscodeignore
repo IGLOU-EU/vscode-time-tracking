@@ -25,5 +25,5 @@ CONTRIBUTING.md
 **/*.ts
 resources/icon.svg
 media/screenshot.png
-# Kept in the .vsix: dist/extension.js, media/history.*, l10n/**, package.nls*.json, resources/icon.png, resources/clock.svg, README.md, LICENSE, PATENTS, CHANGELOG.md
+# What the .vsix keeps is what `npx @vscode/vsce ls` lists once the bundle is built, as the publish job does.
 # The README screenshot ships only in the git repo (referenced by absolute raw URL), not in the .vsix.
