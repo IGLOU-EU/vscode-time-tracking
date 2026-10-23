@@ -9,8 +9,9 @@ import { formatClock, hoursMinutes, clockTime } from './core/activity';
 import { projectIdFromFsPath } from './core/project';
 import { createPendingWrites } from './core/pending-writes';
 import { aggregateByDay, buildMonthsOverview, dayKeyLocal } from './core/aggregate';
+import type { Settings } from './core/settings';
 
-import { readConfig, onConfigChange, type TimeTrackingConfig } from './adapters/config';
+import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
 import { StorageAdapter } from './adapters/storage';
 import { registerSignals } from './adapters/signals';
@@ -130,7 +131,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     status.showIdle();
   }
 
-  function applyConfig(next: TimeTrackingConfig): void {
+  function applyConfig(next: Settings): void {
     config = next;
     tracker.setConfig(next);
     logger.setEnabled(next.debugLogging);

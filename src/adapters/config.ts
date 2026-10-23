@@ -1,71 +1,21 @@
-// Adapter: reads the timeTracking settings and converts them into core units (ms).
+// Adapter: reads the timeTracking settings for the tracked folder. The core validates them and
+// converts them into its units.
 import * as vscode from 'vscode';
-import { truncateReason, normalizeReason } from '../core/manual-entry';
-import type { ExportDateFormat, ExportColumn } from '../core/timesheet';
-
-export interface TimeTrackingConfig {
-  readonly idleThresholdMs: number;
-  readonly backgroundTimeoutMs: number;
-  readonly focusCapMs: number;
-  readonly debugIdleCapMs: number;
-  readonly minSessionMs: number;
-  readonly fontSizePx: number; // History panel base font size in px. 0 = follow the editor font size
-  readonly gitUserEmail: string;
-  readonly debugLogging: boolean;
-  readonly manualReasons: readonly string[]; // preset reasons offered when adding time by hand
-  readonly projectName: string; // display name for the {project} export token, empty = folder name
-  readonly exportColumns: readonly ExportColumn[]; // "Name={template}" mapping, drives header + cells
-  readonly exportSeparator: string; // joins the export columns
-  readonly exportDateFormat: ExportDateFormat; // date preset used by the {date} token
-  readonly defaultReason: string; // {reason} for untagged (plain editor) time
-}
-
-const DATE_FORMATS: readonly ExportDateFormat[] = ['iso8601', 'rfc3339', 'rfc1123', 'rfc1123z', 'rfc850'];
-
-// Each entry is "Name=template". The first '=' splits them, so a template may itself contain '='.
-function parseColumns(entries: readonly string[]): ExportColumn[] {
-  return entries.map((e) => {
-    const i = e.indexOf('=');
-    return i < 0 ? { name: e, template: '' } : { name: e.slice(0, i), template: e.slice(i + 1) };
-  });
-}
+import { normalizeSettings, type Settings } from '../core/settings';
 
 // In a multi-root workspace, a folder's own settings (scopes resource and machine-overridable) apply
 // only to a read that names that folder. Outside any folder, null asks for the value of no particular
 // resource, which an unscoped read of a resource setting would log as unexpected.
 // https://code.visualstudio.com/api/references/contribution-points#contributes.configuration
 // (scopes) and src/vs/workbench/api/common/extHostConfiguration.ts (release/1.82, the null scope).
-export function readConfig(folder: vscode.Uri | undefined): TimeTrackingConfig {
+export function readConfig(folder: vscode.Uri | undefined): Settings {
   const c = vscode.workspace.getConfiguration('timeTracking', folder ?? null);
-  const idleThresholdMs = c.get<number>('inactivityThresholdMinutes', 30) * 60_000;
-  // The focus cap doubles as the unfocused idle cap and must outlast the out-grace, so the grace
-  // window is well-formed. 0 keeps its "disabled" meaning, any positive value is raised to the
-  // threshold.
-  const rawFocusCapMs = c.get<number>('focusedIdleCapMinutes', 60) * 60_000;
-  return {
-    idleThresholdMs,
-    backgroundTimeoutMs: c.get<number>('backgroundProcessTimeoutMinutes', 30) * 60_000,
-    focusCapMs: rawFocusCapMs > 0 ? Math.max(rawFocusCapMs, idleThresholdMs) : 0,
-    debugIdleCapMs: c.get<number>('debugIdleCapHours', 0) * 3_600_000,
-    minSessionMs: c.get<number>('minSessionMinutes', 1) * 60_000,
-    fontSizePx: c.get<number>('fontSize', 14),
-    gitUserEmail: c.get<string>('gitUserEmail', '').trim(),
-    debugLogging: c.get<boolean>('debugLogging', false),
-    // Defaults come from the package.json contribution (single source of truth). Truncate each preset
-    // as it is ingested: the stored setting is never rewritten (the schema's maxLength only warns),
-    // this read is what enforces the cap. Capitalization is applied later, when a time entry is
-    // saved, not to the setting.
-    manualReasons: c.get<string[]>('manualReasons', []).map(truncateReason).filter(Boolean),
-    projectName: c.get<string>('projectName', '').trim(),
-    exportColumns: parseColumns(c.get<string[]>('exportColumns', [])),
-    exportSeparator: c.get<string>('exportSeparator', ','),
-    exportDateFormat: readDateFormat(c.get<string>('exportDateFormat', 'iso8601')),
-    defaultReason: normalizeReason(c.get<string>('defaultReason', 'Development')),
-  };
-}
-
-function readDateFormat(value: string): ExportDateFormat {
-  return (DATE_FORMATS as readonly string[]).includes(value) ? (value as ExportDateFormat) : 'iso8601';
+  // get() with no fallback already returns the manifest default of an unset key. A value of the
+  // wrong type gets that same default, read through inspect() instead of restated here.
+  return normalizeSettings(
+    (key) => c.get(key),
+    (key) => c.inspect(key)?.defaultValue,
+  );
 }
 
 export function onConfigChange(callback: () => void): vscode.Disposable {

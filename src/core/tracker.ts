@@ -286,8 +286,8 @@ export function createTracker(config: TrackerConfig): Tracker {
       if (phase === 'active') {
         if (!eligible(now)) {
           // Out-grace elapsed unfocused: hold it provisionally and run the focus cap as the idle
-          // timer. Coming back before the cap keeps the grace, the cap drops it (deducted). The
-          // config adapter guarantees focusCapMs >= idleThresholdMs when set, so graceEnd never
+          // timer. Coming back before the cap keeps the grace, the cap drops it (deducted).
+          // normalizeSettings guarantees focusCapMs >= idleThresholdMs when set, so graceEnd never
           // outlasts the cap (a smaller cap would drop the grace before it is even reached).
           if (!windowFocused && !continuous() && Number.isFinite(cap(focusCapMs))) {
             graceEnd = silenceSince() + idleThresholdMs;

@@ -1,3 +1,4 @@
 {
-  "timeTracking.projectName": "Beta"
+  "timeTracking.projectName": "Beta",
+  "timeTracking.inactivityThresholdMinutes": "abc"
 }

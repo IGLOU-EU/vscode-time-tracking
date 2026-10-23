@@ -23,4 +23,10 @@ suite('Settings in a multi-root workspace', () => {
     assert.notStrictEqual(outside, 5 * 60_000);
     assert.strictEqual(readConfig(folder('beta')).minSessionMs, outside);
   });
+
+  test('falls back to the default for a value of the wrong type written by hand', () => {
+    const raw = vscode.workspace.getConfiguration('timeTracking', folder('beta')).get('inactivityThresholdMinutes');
+    assert.strictEqual(raw, 'abc', 'the editor passes the hand-written value through');
+    assert.strictEqual(readConfig(folder('beta')).idleThresholdMs, readConfig(undefined).idleThresholdMs);
+  });
 });

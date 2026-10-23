@@ -13,7 +13,8 @@ export type ExportGranularity = 'session' | 'day';
  * Date presets rendered in the machine's local time, following Go's standard layout constants.
  * `iso8601` is a bare date. The others are full timestamps carrying the local time and zone.
  */
-export type ExportDateFormat = 'iso8601' | 'rfc3339' | 'rfc1123' | 'rfc1123z' | 'rfc850';
+export const EXPORT_DATE_FORMATS = ['iso8601', 'rfc3339', 'rfc1123', 'rfc1123z', 'rfc850'] as const;
+export type ExportDateFormat = (typeof EXPORT_DATE_FORMATS)[number];
 
 /** One output column: a name (used for the header row) and a {token} template for its cell value. */
 export interface ExportColumn {
