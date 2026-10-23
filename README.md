@@ -127,6 +127,8 @@ Works on VSCode and VSCodium 1.82 or later. No proprietary dependency, no networ
 
 From 1.93, a command running in the integrated terminal counts as a running process, through [terminal shell integration](https://code.visualstudio.com/docs/terminal/shell-integration) (on by default for bash, fish, pwsh, zsh and Git Bash). From 1.82 to 1.92, such a command is not seen: it neither starts a session nor keeps an unfocused session going under the background timeout. Everything else works the same, including tasks, debug sessions and the files a terminal command writes in the workspace.
 
+In a remote window (Remote - SSH, a dev container, WSL), the extension runs on the remote machine and stores the time it tracks there. Local and remote histories never mix: the History panel of a remote window shows only what was tracked on that machine, and a local window only what was tracked locally.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev environment and the conventions. AI assistants must read [AGENTS.md](AGENTS.md) first.
