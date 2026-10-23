@@ -19,6 +19,8 @@ interface ContributedSetting {
 }
 
 const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
+  publisher: string;
+  name: string;
   engines: { vscode: string };
   scripts: Record<string, string>;
   devDependencies: Record<string, string>;
@@ -43,6 +45,13 @@ describe('minimum editor version', () => {
   it('states the engines.vscode floor in the README', () => {
     const [major, minor] = floor.split('.');
     expect(readFileSync('README.md', 'utf8')).toContain(`VSCodium ${major}.${minor} or later`);
+  });
+});
+
+describe('README install section', () => {
+  it('links to the Open VSX page of the published extension', () => {
+    // VSCode users download the .vsix from that page, so a renamed extension must not leave it dead.
+    expect(readFileSync('README.md', 'utf8')).toContain(`https://open-vsx.org/extension/${manifest.publisher}/${manifest.name}`);
   });
 });
 

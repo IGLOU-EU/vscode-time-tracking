@@ -7,6 +7,14 @@ designed so you never have to think about it.
 
 ![The history view: monthly totals with month-over-month variation, a 24-hour activity-density curve, a calendar heatmap, and the per-day list with git commit counts](https://gitlab.com/iglou.eu/vscode-time-tracking/-/raw/main/media/screenshot.png)
 
+## Install
+
+Available on [Open VSX](https://open-vsx.org/extension/iglou-eu/time-tracking), the store VSCodium reads. In VSCodium, open the extensions view and search for `Time Tracking`. VSCodium then keeps it up to date.
+
+VSCode does not read Open VSX, and the extension is not on the Visual Studio Marketplace. Download the `.vsix` from the Open VSX page, then run **Extensions: Install from VSIX...** from the command palette. VSCode never updates an extension installed this way: for each new version, download its `.vsix` and install it again.
+
+Either editor needs at least the version given under Compatibility below.
+
 ## Why
 
 Starting a time tracker by hand means forgetting it half the time, and
