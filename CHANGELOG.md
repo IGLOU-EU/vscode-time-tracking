@@ -5,47 +5,43 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-23
+
 ### Added
 
 - Clicking last month's total in the History panel opens a page with the project's total tracked time and the total of every month worked.
-- The add time, export, refresh and settings buttons of the History panel are now commands, shown in the view's title bar like the actions of the built-in views. They are also in the Command Palette under Time Tracking, so each can be bound to a key. Run from there, Add Time and Export Timesheet open the view, then their form.
+- The add time, export, refresh and settings buttons move from the History panel into the view's title bar, like the actions of the built-in views. They are now commands, also in the Command Palette under Time Tracking, so each can be bound to a key. Run from there, Add Time and Export Timesheet open the view, then their form.
 
 ### Changed
 
-- The extension package is less than half its former size, 57 KB instead of 126 KB, as the History panel no longer ships an icon font. The magnifier of last month's total is drawn by the panel itself, and the Back button of the months page is now a text button.
 - The extension now installs on VSCode and VSCodium 1.82 and later, instead of 1.93. The README claimed that older editors were supported, yet they refused to install it. Before 1.93, a command running in the integrated terminal is not seen as a running process, and everything else works the same.
+- The extension package is less than half its former size, as the History panel no longer ships an icon font.
 
 ### Fixed
 
-- Trusting a folder opened in Restricted Mode now shows its git commits in the History panel right away. They stayed missing until the window was reloaded.
+- Closing a window no longer risks losing the session it was tracking. The session was saved without waiting while its crash-recovery copy was already being deleted, so an editor shutting down at that moment could lose both. The copy is now deleted only once the session is on disk, and a save that fails is written to the debug log.
+- A setting written by hand with the wrong type no longer breaks tracking. A word in `inactivityThresholdMinutes` disabled the focus safety cap, so a forgotten window kept counting, and closed the session as soon as the window lost focus. A project name that is not text, or a list written as a single text, kept the extension from starting. Such a value is now replaced by the default, and a number outside its range is brought back to its nearest limit.
+- In a multi-root workspace, the settings a folder sets in its own `.vscode/settings.json` now apply while you work in that folder, and moving to a file of another folder switches to that folder's settings. They used to be ignored, so a `projectName` set for one folder never reached its exports.
 - In a window opened on no folder, the status bar now shows "no tracking", and its tooltip says that time is not counted without a folder. It showed a running session as soon as you typed, though that time was never saved.
+- Trusting a folder opened in Restricted Mode now shows its git commits in the History panel right away. They stayed missing until the window was reloaded.
 - The badge that shows today's tracked hours on the History view's activity bar icon now stays up to date while the view is hidden, which is when you see it. It kept the count of the last time the view was on screen. As before, it appears once the view has been shown in the window.
 - A day you expand in the History list now stays expanded when the panel refreshes, every minute during a session, and when you come back to a hidden view. It folded back to one line.
 - A `fontSize` of `0` now sizes the History panel from the editor font size, as its description says, and follows it when it changes. It used the workbench size, a fixed 13 px.
-- The History calendar now names its months and weekdays in the editor's display language, and its day tooltips write the hours and the commit count in that language too. They were always in English.
-- The History day list agrees the commit count with its number ("1 commit", and "0 commit" in French) instead of always writing "commits".
-- The History panel declares the editor's display language instead of English, so a screen reader reads it with the voice of that language.
-- A screen reader no longer reads a paused session twice from the status bar ("Paused: Paused"), and it reads a running session with the punctuation of the display language.
+- The History calendar now names its months and weekdays in the editor's display language, and its day tooltips write the hours and the commit count in that language too. They were always in English. The commit count also agrees with its number ("1 commit", and "0 commit" in French) instead of always writing "commits".
+- A screen reader now reads the History panel with the voice of the editor's display language, which the panel declares instead of English. From the status bar, it no longer reads a paused session twice ("Paused: Paused"), and it reads a running session with the punctuation of the display language.
 - The description of `gitUserEmail` now says that, left empty, it falls back on the global git configuration when the repository sets no email, as it has done since 1.3.0.
-- In a multi-root workspace, the settings a folder sets in its own `.vscode/settings.json` now apply while you work in that folder, and moving to a file of another folder switches to that folder's settings. They used to be ignored, so a `projectName` set for one folder never reached its exports.
-- A setting written by hand with the wrong type no longer breaks tracking. A word in `inactivityThresholdMinutes` disabled the focus safety cap, so a forgotten window kept counting, and closed the session as soon as the window lost focus. A project name that is not text, or a list written as a single text, kept the extension from starting. Such a value is now replaced by the default, and a number outside its range is brought back to its nearest limit.
-- Closing a window no longer risks losing the session it was tracking. The session was saved without waiting while its crash-recovery copy was already being deleted, so an editor shutting down at that moment could lose both. The copy is now deleted only once the session is on disk, and a save that fails is written to the debug log.
 
 ### Tooling
 
-- The History page script is now type-checked and linted with the rest of the code, as browser code whose messages must match what the extension accepts. Both checks skipped it, so a mistake in it only showed in a broken panel.
-- The CI builds the extension bundle on every push, as the local checks already require.
-- The publish job lists every file of the package in its log, which is the reference for what the extension ships. The list written by hand in `.vscodeignore` had fallen behind and is gone.
-- The editor API types are pinned to the minimum supported VSCode version, so a call to a newer API fails the type check instead of breaking on older editors.
-- The integration tests also run on the minimum supported VSCode version, and a unit test keeps the API types and the README on that version.
-- The integration tests also run in a multi-root workspace, where each folder carries its own settings.
-- The integration tests also run in a window without a folder, where nothing is stored.
-- `npm run test:integration` now builds the extension bundle and the tests before it runs them. It ran whatever an earlier build had left, so it could pass on code that no longer existed.
-- The integration tests check that the extension registers every command its manifest contributes. They checked a list written by hand, which had left out Pause or Resume Time Tracking and Show Time Tracking Log.
-- The integration tests run on a pinned recent VSCode instead of the latest stable, so a run tests what the previous one did and `.vscode-test/` keeps one build instead of one per release. With `VSCODIUM_PATH` set to a local VSCodium, they also run on VSCodium.
+- The CI builds the extension bundle on every push, as the local checks already require. The publish job lists every file of the package in its log, which is the reference for what the extension ships, and the list written by hand in `.vscodeignore`, which had fallen behind, is gone.
+- The editor API types are pinned to the minimum supported VSCode version, so a call to a newer API fails the type check instead of breaking on older editors. A unit test keeps the API types and the README on that version.
 - The development Node version in `engines.node` now matches what the build tools require, and npm refuses to install on another one. The extension bundle targets the Node of the oldest supported editor instead.
+- The integration tests run on the minimum supported VSCode version and on a pinned recent one instead of the latest stable, so a run tests what the previous one did and `.vscode-test/` no longer gains a build with every VSCode release. With `VSCODIUM_PATH` set to a local VSCodium, they also run on VSCodium. Besides a single folder, they run in a multi-root workspace, where each folder carries its own settings, and in a window without a folder, where nothing is stored.
+- The integration tests check that the extension registers every command its manifest contributes, instead of a list written by hand that had left out Pause or Resume Time Tracking and Show Time Tracking Log.
+- `npm run test:integration` now builds the extension bundle and the tests before it runs them. It ran whatever an earlier build had left, so it could pass on code that no longer existed.
 - `F5` works from a fresh clone: it compiles the extension and runs it on the sample workspace, in a development host with its own profile and the other extensions disabled.
-- A unit test checks the French translations against the code and the manifest, so a new or reworded string can no longer stay untranslated unnoticed. It found the two status bar countdowns missing from the French bundle and two leftover translations.
+- The History page script is now type-checked and linted with the rest of the code, as browser code whose messages must match what the extension accepts. Both checks skipped it, so a mistake in it only showed in a broken panel.
+- A unit test checks the French translations against the code and the manifest, so a new or reworded string can no longer stay untranslated unnoticed. It also refuses a translation key that is not a plain string literal. It found the two status bar countdowns missing from the French bundle and two leftover translations.
 
 ## [1.3.1] - 2026-08-04
 
