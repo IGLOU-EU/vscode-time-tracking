@@ -38,6 +38,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The integration tests also run on the minimum supported VSCode version, and a unit test keeps the API types and the README on that version.
 - The integration tests also run in a multi-root workspace, where each folder carries its own settings.
 - `npm run test:integration` now builds the extension bundle and the tests before it runs them. It ran whatever an earlier build had left, so it could pass on code that no longer existed.
+- The integration tests check that the extension registers every command its manifest contributes. They checked a list written by hand, which had left out Pause or Resume Time Tracking and Show Time Tracking Log.
 - The development Node version in `engines.node` now matches what the build tools require, and npm refuses to install on another one. The extension bundle targets the Node of the oldest supported editor instead.
 - `F5` works from a fresh clone: it compiles the extension and runs it on the sample workspace, in a development host with its own profile and the other extensions disabled.
 - A unit test checks the French translations against the code and the manifest, so a new or reworded string can no longer stay untranslated unnoticed. It found the two status bar countdowns missing from the French bundle and two leftover translations.

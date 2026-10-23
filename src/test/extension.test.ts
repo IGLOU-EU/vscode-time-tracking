@@ -12,22 +12,20 @@ suite('Time Tracking extension', () => {
     assert.strictEqual(ext.isActive, true);
   });
 
-  test('registers its commands', async () => {
+  test('registers every command the manifest contributes', async () => {
+    // The list comes from the manifest the host loaded, so a new command is checked without a copy here.
     const ext = vscode.extensions.getExtension(EXTENSION_ID);
-    await ext?.activate();
-    const commands = await vscode.commands.getCommands(true);
-    for (const id of [
-      'timeTracking.openHistory',
-      'timeTracking.pause',
-      'timeTracking.resume',
-      'timeTracking.ignoreSession',
-      'timeTracking.addTime',
-      'timeTracking.exportTimesheet',
-      'timeTracking.refreshHistory',
-      'timeTracking.openSettings',
-    ]) {
-      assert.ok(commands.includes(id), `missing command: ${id}`);
-    }
+    assert.ok(ext, `extension ${EXTENSION_ID} not found`);
+    await ext.activate();
+    const manifest = ext.packageJSON as { contributes: { commands: { command: string }[] } };
+    const contributed = manifest.contributes.commands.map((c) => c.command);
+    assert.ok(contributed.length > 0, 'the manifest contributes no command');
+    const registered = await vscode.commands.getCommands(true);
+    assert.deepStrictEqual(
+      contributed.filter((id) => !registered.includes(id)),
+      [],
+      'contributed commands that the extension does not register',
+    );
   });
 
   test('reveals the history view to open a form from the command palette', async () => {
