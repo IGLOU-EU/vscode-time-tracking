@@ -10,7 +10,6 @@ import { projectIdFromFsPath } from './core/project';
 import { createPendingWrites } from './core/pending-writes';
 import { aggregateByDay, buildMonthsOverview, dayKeyLocal } from './core/aggregate';
 import type { Settings } from './core/settings';
-import type { HeatmapLabels } from './core/charts';
 
 import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
@@ -20,6 +19,7 @@ import { getGitApi, CommitCounts } from './adapters/git';
 import { HistoryViewProvider, type HistoryPayload, type HistoryDataPort } from './adapters/history-view';
 import type { ManualEntryInput, MonthsPayload } from './adapters/history-view';
 import { createExportFlow, monthLabel } from './adapters/export';
+import { commitsLabel, heatmapLabels } from './adapters/history-labels';
 import { parseYmd, parseHhMm, composeInterval, normalizeReason } from './core/manual-entry';
 import { createLogger } from './adapters/logger';
 
@@ -409,7 +409,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           date: d.date,
           label: dayLabel(d.date),
           hoursLabel: formatClock(d.seconds * 1000),
-          commits: d.commits,
+          commitsLabel: commitsLabel(d.commits),
           // One sub-line listing each work session's time range, e.g.
           // "Session 1: 09:00-11:00 · Session 2: 14:00-15:30". A manually added block shows its
           // reason instead of "Session N".
@@ -482,26 +482,6 @@ function dayLabel(compact: string): string {
   return new Intl.DateTimeFormat(vscode.env.language, { month: 'short', day: 'numeric' }).format(date);
 }
 
-// The heatmap words in the editor display language. Month and weekday names come from Intl, like
-// the day list dates, so every display language gets them without a translation of its own.
-function heatmapLabels(): HeatmapLabels {
-  const language = vscode.env.language;
-  const month = new Intl.DateTimeFormat(language, { month: 'short' });
-  const weekday = new Intl.DateTimeFormat(language, { weekday: 'short' });
-  const decimal = new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  return {
-    months: Array.from({ length: 12 }, (_, m) => month.format(new Date(2026, m, 1))),
-    weekdays: Array.from({ length: 7 }, (_, d) => weekday.format(new Date(2026, 0, 5 + d))), // January 5, 2026 is a Monday
-    dayTitle: (date, hours, commits) => {
-      const args = { date, hours: decimal.format(hours), count: commits };
-      if (commits === 0) return vscode.l10n.t('{date}: {hours} h', args);
-      return commits === 1
-        ? vscode.l10n.t('{date}: {hours} h, {count} commit', args)
-        : vscode.l10n.t('{date}: {hours} h, {count} commits', args);
-    },
-  };
-}
-
 function historyStrings(): Record<string, string> {
   return {
     history: vscode.l10n.t('History'),
@@ -534,7 +514,6 @@ function historyStrings(): Record<string, string> {
     months: vscode.l10n.t('Months'),
     allMonths: vscode.l10n.t('Show all months'),
     back: vscode.l10n.t('Back'),
-    commitsShort: vscode.l10n.t('commits'),
     session: vscode.l10n.t('Session'),
     trend: vscode.l10n.t('Trend'),
     calendar: vscode.l10n.t('Calendar'),

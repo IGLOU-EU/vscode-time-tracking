@@ -81,14 +81,14 @@
       : '';
 
     const dayRows = days
-      .map((/** @type {{ label?: string, date: string, hoursLabel?: string, commits: number, sessionsLabel?: string }} */ d) => {
+      .map((/** @type {{ label?: string, date: string, hoursLabel?: string, commitsLabel?: string, sessionsLabel?: string }} */ d) => {
         const sessions = d.sessionsLabel ? `<div class="tt-sessions">${esc(d.sessionsLabel)}</div>` : '';
         return (
           `<li class="tt-day-item${d.sessionsLabel ? ' tt-clickable' : ''}">` +
           `<div class="tt-day">` +
           `<span class="tt-day-date">${esc(d.label || d.date)}</span>` +
           `<span class="tt-day-right">` +
-          `<span class="tt-day-commits">${esc(String(d.commits))} ${esc(s.commitsShort || 'commits')}</span>` +
+          `<span class="tt-day-commits">${esc(d.commitsLabel || '')}</span>` +
           `<span class="tt-day-hours">${esc(d.hoursLabel || '')}</span>` +
           `</span>` +
           `</div>` +

@@ -61,10 +61,11 @@
   "Days": "Jours",
   "Less": "Moins",
   "More": "Plus",
-  "commits": "commits",
+  "0 commits": "0 commit",
+  "1 commit": "1 commit",
+  "{count} commits": "{count} commits",
   "{date}: {hours} h": "{date} : {hours} h",
-  "{date}: {hours} h, {count} commit": "{date} : {hours} h, {count} commit",
-  "{date}: {hours} h, {count} commits": "{date} : {hours} h, {count} commits",
+  "{date}: {hours} h, {commits}": "{date} : {hours} h, {commits}",
   "Session": "Session",
   "No tracking data yet.": "Aucune donnée de suivi pour le moment."
 }

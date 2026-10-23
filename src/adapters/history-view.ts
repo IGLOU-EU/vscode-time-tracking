@@ -17,7 +17,7 @@ export interface HistoryPayload {
     date: string;
     label: string;
     hoursLabel: string;
-    commits: number;
+    commitsLabel: string; // agreed with the count, e.g. "1 commit"
     sessionsLabel?: string;
   }>;
   strings: Record<string, string>;

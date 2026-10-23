@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - The History calendar now names its months and weekdays in the editor's display language, and its day tooltips write the hours and the commit count in that language too. They were always in English.
+- The History day list agrees the commit count with its number ("1 commit", and "0 commit" in French) instead of always writing "commits".
 - The History panel declares the editor's display language instead of English, so a screen reader reads it with the voice of that language.
 - A screen reader no longer reads a paused session twice from the status bar ("Paused: Paused"), and it reads a running session with the punctuation of the display language.
 - The description of `gitUserEmail` now says that, left empty, it falls back on the global git configuration when the repository sets no email, as it has done since 1.3.0.
