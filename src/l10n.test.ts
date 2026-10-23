@@ -12,20 +12,21 @@ const strings = (file: string): Record<string, string> => JSON.parse(readFileSyn
 const sorted = (values: Iterable<string>): string[] => [...new Set(values)].sort();
 const paramsOf = (text: string): string[] => sorted([...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]));
 
-function codeLiterals(): string[] {
-  const found: string[] = [];
-  for (const file of readdirSync('src', { recursive: true, encoding: 'utf8' })) {
-    if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
-    for (const match of readFileSync(join('src', file), 'utf8').matchAll(LITERAL)) {
-      found.push(match[2].replace(/\\(.)/g, '$1'));
-    }
-  }
-  return sorted(found);
-}
+// The code that ships, read once: every source file but the tests.
+const sources = readdirSync('src', { recursive: true, encoding: 'utf8' })
+  .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+  .map((file) => ({ file, text: readFileSync(join('src', file), 'utf8') }));
 
 describe('runtime translations', () => {
   const fr = strings('l10n/bundle.l10n.fr.json');
-  const literals = codeLiterals();
+  const literals = sorted(sources.flatMap(({ text }) => [...text.matchAll(LITERAL)].map((m) => m[2].replace(/\\(.)/g, '$1'))));
+
+  it('passes every l10n.t call a plain string literal', () => {
+    // Any other key escapes the checks below, and a text translated once and looked up again is a
+    // key no bundle holds.
+    const calls = sources.flatMap(({ file, text }) => [...text.matchAll(/l10n\.t\((?!\s*['"]).*/g)].map((m) => `${file}: ${m[0]}`));
+    expect(calls).toEqual([]);
+  });
 
   it('translates every l10n.t literal of the code into French', () => {
     expect(literals.filter((key) => !(key in fr))).toEqual([]);

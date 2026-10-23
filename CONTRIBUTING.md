@@ -93,7 +93,7 @@ files keep their target language as their value:
 to the English source first (`package.nls.json` or a `vscode.l10n.t`
 literal), then propagate the translation.
 
-The translation key is the whole English sentence, so pass `vscode.l10n.t` one plain string literal with named parameters (`{name}`). `npm run test:unit` checks the translations against the code ([`src/l10n.test.ts`](src/l10n.test.ts)): it fails on a literal missing from the French bundle, on a translation the code no longer uses, on a translation whose `{name}` parameters differ from its source, and on a manifest key missing from, or unused in, either `package.nls` file.
+The translation key is the whole English sentence, so pass `vscode.l10n.t` one plain string literal with named parameters (`{name}`). `npm run test:unit` checks the translations against the code ([`src/l10n.test.ts`](src/l10n.test.ts)): it fails on a call that passes anything else, a text already translated included, on a literal missing from the French bundle, on a translation the code no longer uses, on a translation whose `{name}` parameters differ from its source, and on a manifest key missing from, or unused in, either `package.nls` file.
 
 The status bar keywords `idle` and `out` are deliberately left untranslated.
 

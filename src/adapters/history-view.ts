@@ -186,7 +186,8 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
     const payload = await this.data.buildPayload();
     void view.webview.postMessage({ type: 'history', payload });
     const todayHours = Math.round(payload.todayHours);
-    view.badge = { value: todayHours, tooltip: vscode.l10n.t(payload.strings.hoursToday, { count: todayHours }) };
+    // The template is already translated: looked up again, it would be a key no bundle holds.
+    view.badge = { value: todayHours, tooltip: payload.strings.hoursToday.replaceAll('{count}', String(todayHours)) };
   }
 
   private html(webview: vscode.Webview): string {
