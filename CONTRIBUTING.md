@@ -64,7 +64,7 @@ npm run compile           # type-check + esbuild bundle to dist/
 npm run test:integration  # smoke tests in a real Extension Host, on the stable and the oldest supported editor
 ```
 
-Use the Node version required by `engines.node` in [`package.json`](package.json), as npm refuses to install on another one. Press `F5` in VSCode/VSCodium to launch the Extension Development Host and try the extension live.
+Use the Node version required by `engines.node` in [`package.json`](package.json), as npm refuses to install on another one. Press `F5` in VSCode/VSCodium to compile and launch the Extension Development Host on the sample workspace (`.vscode/launch.json`), with a dedicated profile under `.vscode-test/` and the other extensions disabled, and try the extension live.
 
 ## External documentation
 

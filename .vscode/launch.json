@@ -1,0 +1,21 @@
+{
+  // Runs the extension in an Extension Development Host on a dedicated profile under
+  // .vscode-test/, never on the daily editor profile, so its settings and tracked time stay apart
+  // from an installed copy. The sample workspace gives it a project folder to track.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--disable-extensions",
+        "--user-data-dir=${workspaceFolder}/.vscode-test/dev-profile",
+        "${workspaceFolder}/test-fixtures/sample-workspace"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: compile"
+    }
+  ]
+}
