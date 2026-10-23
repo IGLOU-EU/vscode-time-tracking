@@ -3,6 +3,7 @@
   "No tracking": "Pas de décompte",
   "Tracking": "Suivi en cours",
   "Paused": "En pause",
+  "Paused (idle -{minutes}m)": "En pause (idle -{minutes}m)",
   "Awaiting confirmation": "En attente de confirmation",
   "{session} (idle -{minutes}m)": "{session} (idle -{minutes}m)",
   "{session} (out -{minutes}m)": "{session} (out -{minutes}m)",

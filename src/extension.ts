@@ -102,7 +102,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // Unfocused out-grace held provisionally: paused look with the idle countdown to the cap.
       const countdown = tracker.getCountdown(now);
       const minutes = countdown ? Math.ceil(countdown.remainingMs / 60_000) : 0;
-      status.showPaused(`${vscode.l10n.t('Paused')} (idle -${minutes}m)`);
+      status.showPaused(vscode.l10n.t('Paused (idle -{minutes}m)', { minutes }));
       return;
     }
     if (phase === 'active') {
