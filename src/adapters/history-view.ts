@@ -2,7 +2,8 @@
 // the extension host computes everything (SVG, labels) and sends it via postMessage. Without
 // retainContextWhenHidden, we only post to a visible view and re-push on visibility/refresh.
 import * as vscode from 'vscode';
-import type { ExportGranularity } from '../core/timesheet';
+import { fromPage, type ExportRequest, type ManualEntryInput } from '../core/page-message';
+import type { Logger } from './logger';
 
 export interface HistoryPayload {
   trendSvg: string;
@@ -32,14 +33,6 @@ export interface MonthsPayload {
   months: Array<{ label: string; hoursLabel: string }>;
 }
 
-/** Raw field values from the add-time form, validated by the core on the host side. */
-export interface ManualEntryInput {
-  reason: string;
-  date: string;
-  start: string;
-  end: string;
-}
-
 /** A selectable month in the export modal. */
 export interface ExportMonth {
   value: string; // YYYYMM
@@ -52,13 +45,6 @@ export interface ExportOpen {
   months: ExportMonth[];
   defaultMonth: string | null; // preselected value, null when no data
   defaultPath: string;
-}
-
-/** The chosen export parameters submitted from the modal. */
-export interface ExportRequest {
-  month: string;
-  granularity: ExportGranularity;
-  path: string;
 }
 
 export interface HistoryDataPort {
@@ -75,12 +61,6 @@ export interface HistoryDataPort {
   runExport(request: ExportRequest): Promise<string | null>;
 }
 
-type InboundMessage =
-  | { type: 'ready' | 'refresh' | 'openSettings' | 'openExport' | 'openMonths' }
-  | ({ type: 'submitEntry' } & ManualEntryInput)
-  | { type: 'exportBrowse'; path: string }
-  | ({ type: 'exportRun' } & ExportRequest);
-
 export class HistoryViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'timeTracking.historyView'; // must match contributes.views id
 
@@ -89,6 +69,7 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly data: HistoryDataPort,
+    private readonly logger: Pick<Logger, 'log'>,
   ) {}
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -97,7 +78,14 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
     view.webview.options = { enableScripts: true, localResourceRoots: [media] };
     view.webview.html = this.html(view.webview);
 
-    const sub = view.webview.onDidReceiveMessage((msg: InboundMessage) => {
+    const sub = view.webview.onDidReceiveMessage((raw: unknown) => {
+      const msg = fromPage(raw);
+      if (!msg) {
+        // Only a bug of the page gets here: say which message, never act on it.
+        const type = typeof raw === 'object' && raw !== null ? (raw as { type?: unknown }).type : raw;
+        this.logger.log('page-message-ignored', { type: typeof type === 'string' ? type : typeof type });
+        return;
+      }
       if (msg.type === 'ready' || msg.type === 'refresh') {
         void this.refresh();
         return;

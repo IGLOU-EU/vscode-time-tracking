@@ -7,7 +7,8 @@ import * as path from 'node:path';
 import { monthKey } from '../core/aggregate';
 import { buildDays, type HistoryDay } from '../core/history';
 import { renderTimesheet, type ExportColumn, type ExportDateFormat } from '../core/timesheet';
-import type { ExportOpen, ExportRequest } from './history-view';
+import type { ExportRequest } from '../core/page-message';
+import type { ExportOpen } from './history-view';
 import type { Logger } from './logger';
 import type { StorageAdapter } from './storage';
 

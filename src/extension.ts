@@ -10,6 +10,7 @@ import { projectIdFromFsPath } from './core/project';
 import { createPendingWrites } from './core/pending-writes';
 import { aggregateByDay, buildMonthsOverview, dayKeyLocal } from './core/aggregate';
 import type { Settings } from './core/settings';
+import type { ManualEntryInput } from './core/page-message';
 
 import { readConfig, onConfigChange } from './adapters/config';
 import { createStatusView } from './adapters/status-bar';
@@ -17,7 +18,7 @@ import { StorageAdapter } from './adapters/storage';
 import { registerSignals } from './adapters/signals';
 import { getGitApi, CommitCounts } from './adapters/git';
 import { HistoryViewProvider, type HistoryPayload, type HistoryDataPort } from './adapters/history-view';
-import type { ManualEntryInput, MonthsPayload } from './adapters/history-view';
+import type { MonthsPayload } from './adapters/history-view';
 import { createExportFlow, monthLabel } from './adapters/export';
 import { commitsLabel, heatmapLabels } from './adapters/history-labels';
 import { parseYmd, parseHhMm, composeInterval, normalizeReason } from './core/manual-entry';
@@ -79,7 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     browseExportPath: exportFlow.browseExportPath,
     runExport: exportFlow.runExport,
   };
-  const historyProvider = new HistoryViewProvider(context.extensionUri, dataPort);
+  const historyProvider = new HistoryViewProvider(context.extensionUri, dataPort, logger);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(HistoryViewProvider.viewType, historyProvider, {
       webviewOptions: { retainContextWhenHidden: false },

@@ -7,7 +7,8 @@ import type { HistoryDay } from './history';
 import { clockTime, durationHm, pad2 } from './activity';
 
 /** One output row per contiguous session, or one row per description within each day. */
-export type ExportGranularity = 'session' | 'day';
+export const EXPORT_GRANULARITIES = ['session', 'day'] as const;
+export type ExportGranularity = (typeof EXPORT_GRANULARITIES)[number];
 
 /**
  * Date presets rendered in the machine's local time, following Go's standard layout constants.
