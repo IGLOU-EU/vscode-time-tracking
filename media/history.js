@@ -1,9 +1,7 @@
-//@ts-check
 // Webview = pure renderer. All geometry (SVG) and labels are computed on the extension host and
 // sent via postMessage. Here we only inject markup. See docs/webview-design-rules.md.
 (function () {
-  // acquireVsCodeApi is injected by the VS Code webview runtime, ONCE per document.
-  // @ts-ignore
+  // acquireVsCodeApi is injected by the VS Code webview runtime, ONCE per document (webview.d.ts).
   const vscode = acquireVsCodeApi();
   const app = /** @type {HTMLElement} */ (document.getElementById('app'));
 
@@ -418,7 +416,9 @@
     }
     const run = /** @type {HTMLButtonElement} */ (document.getElementById('tt-x-run'));
     if (run) run.disabled = true;
-    vscode.postMessage({ type: 'exportRun', month: month.value, granularity: gran.value, path: pathInput.value.trim() });
+    // The select only offers the two granularities, and the host checks the value again.
+    const granularity = /** @type {import('../src/core/timesheet').ExportGranularity} */ (gran.value);
+    vscode.postMessage({ type: 'exportRun', month: month.value, granularity, path: pathInput.value.trim() });
   }
 
   /** @param {string} [message] */

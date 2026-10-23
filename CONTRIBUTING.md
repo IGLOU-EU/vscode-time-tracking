@@ -56,7 +56,7 @@ In docs:
 git clone https://gitlab.com/iglou.eu/vscode-time-tracking
 cd vscode-time-tracking
 npm install
-npm run check-types       # tsc --noEmit
+npm run check-types       # tsc --noEmit, on the extension and on the History page (media/)
 npm run lint              # eslint
 npm run test:unit         # Vitest on the pure core
 npm run test:unit:watch   # TDD loop (red-green-refactor)

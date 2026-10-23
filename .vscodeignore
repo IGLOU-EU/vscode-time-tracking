@@ -15,6 +15,7 @@ esbuild.js
 eslint.config.mjs
 tsconfig.json
 tsconfig.test.json
+media/tsconfig.json
 vitest.config.ts
 coverage/**
 AGENTS.md

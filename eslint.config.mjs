@@ -10,8 +10,6 @@ export default tseslint.config(
       'coverage/**',
       '.vscode-test/**',
       'node_modules/**',
-      // Vanilla browser script for the webview, linted by the TS compiler via //@ts-check.
-      'media/**',
     ],
   },
   js.configs.recommended,
@@ -23,6 +21,14 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    // The History page: a classic browser script, loaded as is by the webview.
+    files: ['media/**/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: { ...globals.browser, acquireVsCodeApi: 'readonly' },
     },
   },
   {
