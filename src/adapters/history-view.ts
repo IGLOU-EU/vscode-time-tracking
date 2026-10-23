@@ -179,12 +179,15 @@ export class HistoryViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  // Push fresh data to the webview. No-op unless the view exists and is visible.
+  // Push fresh data to the webview and its badge. The badge shows on the activity bar while the
+  // view is out of sight, so a hidden view gets it too, and only the page waits until it is shown.
+  // A view never shown has no WebviewView yet, so it has no badge to set.
   async refresh(): Promise<void> {
     const view = this.view;
-    if (!view || !view.visible) return;
+    if (!view) return;
     const payload = await this.data.buildPayload();
-    void view.webview.postMessage({ type: 'history', payload });
+    if (this.view !== view) return; // disposed while building, and a disposed view throws
+    if (view.visible) void view.webview.postMessage({ type: 'history', payload });
     const todayHours = Math.round(payload.todayHours);
     // The template is already translated: looked up again, it would be a key no bundle holds.
     view.badge = { value: todayHours, tooltip: payload.strings.hoursToday.replaceAll('{count}', String(todayHours)) };
