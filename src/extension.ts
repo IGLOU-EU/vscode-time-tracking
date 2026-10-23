@@ -7,6 +7,7 @@ import { createTracker, type Tracker } from './core/tracker';
 import { buildHistoryModel, historyWindowStartMs } from './core/history';
 import { formatClock, hoursMinutes, clockTime } from './core/activity';
 import { projectIdFromFsPath } from './core/project';
+import { createPendingWrites } from './core/pending-writes';
 import { aggregateByDay, buildMonthsOverview, dayKeyLocal } from './core/aggregate';
 
 import { readConfig, onConfigChange } from './adapters/config';
@@ -159,12 +160,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     refreshHistory();
   }
 
+  // Interval writes start from the tracker's synchronous callback, so nobody awaits them: kept here
+  // for deactivate to wait on. A failure lands in the log right after its 'interval' line, so the
+  // lost time stays explainable.
+  const pendingWrites = createPendingWrites((error) => logger.log('write-failed', { error: String(error) }));
+
   // Committed intervals are written under the project active at emit time.
   tracker.onIntervalClosed((iv) => {
     logger.log('interval', { start: iv.start, end: iv.end, ms: iv.end - iv.start, project: currentProjectId });
     const pid = currentProjectId;
     if (!pid) return;
-    void storage.appendInterval(pid, iv).then(refreshHistory);
+    pendingWrites.track(storage.appendInterval(pid, iv).then(refreshHistory));
   });
 
   // Log which silence limit paused the session and by how much.
@@ -469,6 +475,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   onDeactivate = async () => {
     watcher?.dispose();
     tracker.flush(Date.now());
+    // The host waits for the Promise returned by deactivate, then exits, so a write left running
+    // may never land (https://code.visualstudio.com/api/references/activation-events#Start-up).
+    // The marker is the only copy of the open session until its interval is on disk: it is removed
+    // only after every pending write has finished.
+    await pendingWrites.settled();
     if (currentProjectId) await storage.writeOpenMarker(currentProjectId, null, Date.now());
   };
 }
