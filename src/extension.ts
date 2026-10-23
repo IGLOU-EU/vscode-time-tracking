@@ -8,6 +8,7 @@ import { buildHistoryModel, historyWindowStartMs } from './core/history';
 import { formatClock, hoursMinutes, clockTime } from './core/activity';
 import { projectIdFromFsPath } from './core/project';
 import { createPendingWrites } from './core/pending-writes';
+import { statusModel } from './core/status';
 import { aggregateByDay, buildMonthsOverview, dayKeyLocal } from './core/aggregate';
 import type { Settings } from './core/settings';
 import type { ManualEntryInput } from './core/page-message';
@@ -96,41 +97,42 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       logger.log('phase', { phase, openMs: tracker.currentOpenMs(now) });
       lastPhaseShown = phase;
     }
-    if (phase === 'paused') {
-      status.showPaused(vscode.l10n.t('Paused'));
-      return;
-    }
-    if (phase === 'grace') {
-      // Unfocused out-grace held provisionally: paused look with the idle countdown to the cap.
-      const countdown = tracker.getCountdown(now);
-      const minutes = countdown ? Math.ceil(countdown.remainingMs / 60_000) : 0;
-      status.showPaused(vscode.l10n.t('Paused (idle -{minutes}m)', { minutes }));
-      return;
-    }
-    if (phase === 'active') {
-      const elapsed = tracker.currentOpenMs(now);
-      const { hours, minutes } = hoursMinutes(elapsed);
-      // While idle and counting down toward a pause, show the minutes before suspension: "out" for
-      // the unfocused grace, "idle" toward a safety cap (focus or debug).
-      const countdown = tracker.getCountdown(now);
-      let text: string;
-      if (!countdown) {
-        text = formatClock(elapsed);
-      } else {
-        const mins = Math.ceil(countdown.remainingMs / 60_000);
-        const idle = countdown.reason === 'focus-cap' || countdown.reason === 'debug-cap';
-        text = idle
-          ? vscode.l10n.t('{session} (idle -{minutes}m)', { session: formatClock(elapsed), minutes: mins })
-          : vscode.l10n.t('{session} (out -{minutes}m)', { session: formatClock(elapsed), minutes: mins });
+    const shown = statusModel({
+      hasProject: currentProjectId !== undefined,
+      phase,
+      openMs: tracker.currentOpenMs(now),
+      countdown: tracker.getCountdown(now),
+    });
+    switch (shown.state) {
+      case 'no-folder':
+        status.showIdle(vscode.l10n.t('Time is not counted in a window without a folder.'));
+        return;
+      case 'idle':
+        status.showIdle();
+        return;
+      case 'pending':
+        status.showPending(vscode.l10n.t('Awaiting confirmation'));
+        return;
+      case 'paused':
+        status.showPaused(vscode.l10n.t('Paused'));
+        return;
+      case 'grace':
+        status.showPaused(vscode.l10n.t('Paused (idle -{minutes}m)', { minutes: shown.idleMinutes }));
+        return;
+      case 'running': {
+        const session = formatClock(shown.openMs);
+        const { hours, minutes } = hoursMinutes(shown.openMs);
+        const left = shown.countdown;
+        const text =
+          left === null
+            ? session
+            : left.kind === 'idle'
+              ? vscode.l10n.t('{session} (idle -{minutes}m)', { session, minutes: left.minutes })
+              : vscode.l10n.t('{session} (out -{minutes}m)', { session, minutes: left.minutes });
+        status.showRunning(text, vscode.l10n.t('Session: {hours}h {minutes}m', { hours, minutes }));
+        return;
       }
-      status.showRunning(text, vscode.l10n.t('Session: {hours}h {minutes}m', { hours, minutes }));
-      return;
     }
-    if (phase === 'pending') {
-      status.showPending(vscode.l10n.t('Awaiting confirmation'));
-      return;
-    }
-    status.showIdle();
   }
 
   function applyConfig(next: Settings): void {

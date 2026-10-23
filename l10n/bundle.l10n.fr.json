@@ -9,6 +9,7 @@
   "{session} (out -{minutes}m)": "{session} (out -{minutes}m)",
   "Session: {hours}h {minutes}m": "Session : {hours} h {minutes} min",
   "Time tracking: no tracking": "Suivi du temps : pas de décompte",
+  "Time is not counted in a window without a folder.": "Le temps n'est pas compté dans une fenêtre sans dossier.",
   "{count} hours tracked today": "{count} heures suivies aujourd'hui",
   "History": "Historique",
   "Add time": "Ajouter du temps",

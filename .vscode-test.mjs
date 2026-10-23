@@ -36,15 +36,22 @@ const multiRoot = {
   workspaceFolder: './test-fixtures/multi-root/multi-root.code-workspace',
 };
 
+// A window without a folder stores no time, so it gets its own window too. test-cli opens one for an
+// entry that names no workspaceFolder (see the DesktopPlatform of @vscode/test-cli).
+const noFolder = { ...shared, files: 'out/test/no-folder/*.test.js' };
+
 export default defineConfig([
   { label: 'integration', version: recent, ...singleFolder },
   { label: 'integration-multi-root', version: recent, ...multiRoot },
+  { label: 'integration-no-folder', version: recent, ...noFolder },
   { label: 'floor', version: floor, ...singleFolder },
   { label: 'floor-multi-root', version: floor, ...multiRoot },
+  { label: 'floor-no-folder', version: floor, ...noFolder },
   ...(codium
     ? [
         { label: 'vscodium', useInstallation: { fromPath: codium }, ...singleFolder },
         { label: 'vscodium-multi-root', useInstallation: { fromPath: codium }, ...multiRoot },
+        { label: 'vscodium-no-folder', useInstallation: { fromPath: codium }, ...noFolder },
       ]
     : []),
 ]);

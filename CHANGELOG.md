@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- In a window opened on no folder, the status bar now shows "no tracking", and its tooltip says that time is not counted without a folder. It showed a running session as soon as you typed, though that time was never saved.
 - The badge that shows today's tracked hours on the History view's activity bar icon now stays up to date while the view is hidden, which is when you see it. It kept the count of the last time the view was on screen. As before, it appears once the view has been shown in the window.
 - A day you expand in the History list now stays expanded when the panel refreshes, every minute during a session, and when you come back to a hidden view. It folded back to one line.
 - A `fontSize` of `0` now sizes the History panel from the editor font size, as its description says, and follows it when it changes. It used the workbench size, a fixed 13 px.
@@ -37,6 +38,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The editor API types are pinned to the minimum supported VSCode version, so a call to a newer API fails the type check instead of breaking on older editors.
 - The integration tests also run on the minimum supported VSCode version, and a unit test keeps the API types and the README on that version.
 - The integration tests also run in a multi-root workspace, where each folder carries its own settings.
+- The integration tests also run in a window without a folder, where nothing is stored.
 - `npm run test:integration` now builds the extension bundle and the tests before it runs them. It ran whatever an earlier build had left, so it could pass on code that no longer existed.
 - The integration tests check that the extension registers every command its manifest contributes. They checked a list written by hand, which had left out Pause or Resume Time Tracking and Show Time Tracking Log.
 - The integration tests run on a pinned recent VSCode instead of the latest stable, so a run tests what the previous one did and `.vscode-test/` keeps one build instead of one per release. With `VSCODIUM_PATH` set to a local VSCodium, they also run on VSCodium.

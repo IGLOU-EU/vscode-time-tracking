@@ -36,7 +36,9 @@ stepping away).
   gives 3 hours), and the history lists them as separate sessions with
   the overlap counted once, so the sessions always sum to the day total.
 - **One project = one folder.** In multi-folder workspaces, time is
-  attributed to the folder of the active file.
+  attributed to the folder of the active file. A window opened on no
+  folder has no project to hold the time, so it counts nothing and its
+  status bar shows "no tracking".
 - **Automatic, focus-aware tracking.** Counting starts on a real action
   (typing, scrolling, navigating, a file write, a running process) and
   keeps going while the window is focused, so thinking and reading

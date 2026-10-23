@@ -28,4 +28,14 @@ describe('createStatusView in French', () => {
     createStatusView().showPaused('En pause (idle -5m)');
     expect(item.accessibilityInformation).toEqual({ label: 'En pause (idle -5m)' });
   });
+
+  it('shows no tracking with its reason, and reads the reason alone', () => {
+    const reason = "Le temps n'est pas compté dans une fenêtre sans dossier.";
+    createStatusView().showIdle(reason);
+    expect(item).toMatchObject({
+      text: '$(circle-slash) Pas de décompte',
+      tooltip: reason,
+      accessibilityInformation: { label: reason },
+    });
+  });
 });

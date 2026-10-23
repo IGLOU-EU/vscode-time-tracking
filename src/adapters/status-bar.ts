@@ -6,7 +6,8 @@ export interface StatusView {
   showRunning(elapsed: string, tooltipMarkdown: string): void;
   showPending(label: string): void;
   showPaused(label: string): void;
-  showIdle(): void;
+  /** No tracking, with the reason in the tooltip when there is one. */
+  showIdle(reason?: string): void;
   dispose(): void;
 }
 
@@ -48,13 +49,14 @@ export function createStatusView(): StatusView {
       item.color = orange;
       item.accessibilityInformation = { label }; // the label already starts with the paused state
     },
-    showIdle() {
+    showIdle(reason) {
       const label = vscode.l10n.t('No tracking');
       item.text = `$(circle-slash) ${label}`;
-      item.tooltip = undefined;
+      item.tooltip = reason;
       item.backgroundColor = undefined;
       item.color = red;
-      item.accessibilityInformation = { label: vscode.l10n.t('Time tracking: no tracking') };
+      // A reason is a whole sentence that already says nothing is counted.
+      item.accessibilityInformation = { label: reason ?? vscode.l10n.t('Time tracking: no tracking') };
     },
     dispose() {
       item.dispose();
