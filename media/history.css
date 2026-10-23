@@ -12,7 +12,11 @@ body {
   color: var(--vscode-foreground);
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
   font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size, 13px); /* the base every size scales from, for accessibility */
+  /* The base every size scales from, for accessibility. The page applies the fontSize setting over
+     it, and 0 leaves this one: the editor font size, which the editor gives every webview and updates
+     live (src/vs/workbench/contrib/webview/browser/themeing.ts, release/1.82). --vscode-font-size is
+     the workbench size there, a fixed 13px. */
+  font-size: var(--vscode-editor-font-size, 13px);
   overflow-x: hidden;
 }
 

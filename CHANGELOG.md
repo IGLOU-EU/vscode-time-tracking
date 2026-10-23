@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - The badge that shows today's tracked hours on the History view's activity bar icon now stays up to date while the view is hidden, which is when you see it. It kept the count of the last time the view was on screen. As before, it appears once the view has been shown in the window.
+- A `fontSize` of `0` now sizes the History panel from the editor font size, as its description says, and follows it when it changes. It used the workbench size, a fixed 13 px.
 - The History calendar now names its months and weekdays in the editor's display language, and its day tooltips write the hours and the commit count in that language too. They were always in English.
 - The History day list agrees the commit count with its number ("1 commit", and "0 commit" in French) instead of always writing "commits".
 - The History panel declares the editor's display language instead of English, so a screen reader reads it with the voice of that language.
